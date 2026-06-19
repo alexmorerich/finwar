@@ -1,0 +1,25 @@
+{
+  // FinWar v4 — the contract-typed Cloudflare Worker lives under `src/`.
+  // Scope `include` to `src/` + `test/` only: the legacy v3.2/terrain engine in
+  // `engine/` is plain ESM JS (its own zero-dep Node test suite) and is NOT part
+  // of the typed surface. Mirrors finos/tsconfig.json (NodeNext, strict) so the
+  // shared contracts/ typecheck identically across services.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

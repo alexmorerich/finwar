@@ -5,3 +5,7 @@ history/
 backup/
 .playwright-mcp/
 finwar-dual.png
+dist/
+.wrangler/
+.dev.vars
+*.tsbuildinfo

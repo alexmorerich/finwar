@@ -1,0 +1,6 @@
+# FinWar local secrets for `wrangler dev`. Copy to `.dev.vars` (gitignored).
+#
+# Optional bearer token guarding POST /simulate. When set, callers (FinOS) must
+# send `Authorization: Bearer <FINWAR_TOKEN>`. Leave unset to run /simulate open.
+# In production set it with: wrangler secret put FINWAR_TOKEN
+FINWAR_TOKEN=

@@ -1,0 +1,25 @@
+{
+  // Cloudflare Worker config for FinWar — the Geopolitical Financial Threat
+  // Simulation Engine (the TRUTH layer that feeds FinOS).
+  //
+  // FinOS reaches FinWar over HTTP and depends on:
+  //   POST /simulate { scenario, macro_inputs? } -> WorldState
+  //   GET  /state                                -> latest WorldState
+  //   GET  /health
+  //
+  // SECRET (optional; set with `wrangler secret put FINWAR_TOKEN`):
+  //   FINWAR_TOKEN — bearer token guarding the compute route (POST /simulate).
+  //   When unset, /simulate is open. FinOS sends this token as `Authorization:
+  //   Bearer <FINWAR_TOKEN>` (see finos wrangler.jsonc / finos http client).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "finwar",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-01",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Scenario used by GET /state before the first /simulate call.
+    "FINWAR_DEFAULT_SCENARIO": "baseline"
+  }
+}
