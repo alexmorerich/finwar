@@ -1,29 +1,122 @@
-// FINWAR 3D — the holder's actual portfolio (AssetPosition[]).
+// FINWAR v3.3 — calibration assets (spec §7), expressed in the full Asset schema.
 //
-// Holder profile: China-mainland tax resident, Chinese national.
-//   → everything offshore is CRS-reportable to China (high Z/TAX across the book);
-//     capital-control bite is muted because little sits onshore.
+// The lesson of this set: an asset's listing label lies. O87 / S27 trade on SGX
+// and look Singaporean, but their ultimate custodian is State Street and they
+// clear through DTC / CHIPS — so OFAC reaches them (ofacDependency HIGH). DBS D05
+// trades on the same exchange yet stays LOW, because its kill chain (CDP / MEPS+ /
+// PayNow, custodian CDP) never touches a US rail. "Not where it trades — who holds
+// the kill switch." (spec §8)
 //
-// weights are illustrative and MUST sum to 1.0 — edit to your real NAV split.
-// Known anchor: IBKR GLDM = USD 150k.
+// Spec §8 HARD shift: model settlement networks + ultimate custodians, never the
+// custody-country label. No weights / allocation % (this is a facts layer).
 export const PORTFOLIO = [
-  // ── US broker — paper gold ETF (US-cleared, CRS-reported) ──
-  { id: "ibkr_gldm",  assetType: "Gold",   custodyCountry: "US",          institution: "IBKR",                weight: 0.20 }, // GLDM $150k
+  // ── SGX-listed ETF, US-cleared via State Street → OFAC HIGH despite SG listing ──
+  {
+    id: "O87",
+    label: "SPDR Gold Shares (SGX O87)",
+    assetClass: "ETF",
+    custodyJurisdiction: "Singapore",
+    settlementSystem: "Singapore_Settlement",
+    assetType: "ETF",
+    jurisdiction: "Singapore",
+    exchange: "SGX",
+    broker: "StandardChartered_SG",
+    ultimateCustodian: "StateStreet",
+    settlementNetwork: ["CDP", "DTC", "CHIPS"],
+    beneficialOwnershipModel: "nominee",
+  },
+  {
+    id: "S27",
+    label: "SPDR S&P 500 ETF (SGX S27)",
+    assetClass: "ETF",
+    custodyJurisdiction: "Singapore",
+    settlementSystem: "Singapore_Settlement",
+    assetType: "ETF",
+    jurisdiction: "Singapore",
+    exchange: "SGX",
+    broker: "StandardChartered_SG",
+    ultimateCustodian: "StateStreet",
+    settlementNetwork: ["CDP", "DTC", "CHIPS"],
+    beneficialOwnershipModel: "nominee",
+  },
 
-  // ── Singapore banks — cash / deposits ──
-  { id: "dbs_cash",   assetType: "Cash",   custodyCountry: "Singapore",   institution: "DBS",                 weight: 0.08 },
-  { id: "ocbc_cash",  assetType: "Cash",   custodyCountry: "Singapore",   institution: "OCBC",                weight: 0.07 },
-  { id: "scsg_cash",  assetType: "Cash",   custodyCountry: "Singapore",   institution: "SC_SG",               weight: 0.05 },
+  // ── Pure-Singapore kill chain — local custodian (CDP direct register) → OFAC LOW ──
+  {
+    id: "D05",
+    label: "DBS Group Holdings (SGX D05)",
+    assetClass: "Equity",
+    custodyJurisdiction: "Singapore",
+    settlementSystem: "Singapore_Settlement",
+    assetType: "Equity",
+    jurisdiction: "Singapore",
+    exchange: "SGX",
+    broker: "DBS_Vickers",
+    ultimateCustodian: "CDP",
+    settlementNetwork: ["CDP", "MEPS+", "PayNow"],
+    beneficialOwnershipModel: "direct_register",
+  },
 
-  // ── Hong Kong top-tier banks & broker ──
-  { id: "hsbc_cash",  assetType: "Cash",   custodyCountry: "HongKong",    institution: "HSBC_HK",             weight: 0.08 },
-  { id: "scbhk_cash", assetType: "Cash",   custodyCountry: "HongKong",    institution: "StandardCharteredHK", weight: 0.05 },
-  { id: "bochk_cash", assetType: "Cash",   custodyCountry: "HongKong",    institution: "BOCHK",               weight: 0.05 },
-  { id: "futu_eq",    assetType: "Equity", custodyCountry: "HongKong",    institution: "Futu",                weight: 0.07 },
+  // ── US-domiciled T-bill ETF, held via a HK broker → still OFAC HIGH (US rails) ──
+  {
+    id: "SGOV",
+    label: "iShares 0-3M Treasury ETF (SGOV)",
+    assetClass: "ETF",
+    custodyJurisdiction: "US",
+    settlementSystem: "US_Settlement",
+    assetType: "ETF",
+    jurisdiction: "US",
+    exchange: "NYSE",
+    broker: "WingLung_HK",
+    ultimateCustodian: "StateStreet",
+    settlementNetwork: ["DTCC", "DTC", "CHIPS"],
+    beneficialOwnershipModel: "nominee",
+  },
 
-  // ── Cold wallet — self-custodied on-chain ──
-  { id: "cw_btc",     assetType: "Crypto", custodyCountry: "SelfCustody", institution: "CryptoWallet",        weight: 0.15 }, // BTC
-  { id: "cw_xaut",    assetType: "Crypto", custodyCountry: "SelfCustody", institution: "CryptoWallet",        weight: 0.07 }, // XAUT (gold-backed)
-  { id: "cw_usdt",    assetType: "Crypto", custodyCountry: "SelfCustody", institution: "CryptoWallet",        weight: 0.07 }, // USDT
-  { id: "cw_usdc",    assetType: "Crypto", custodyCountry: "SelfCustody", institution: "CryptoWallet",        weight: 0.06 }, // USDC
+  // ── HK Tracker Fund — HK rails, HSBC custodian → OFAC MEDIUM (USD-correspondent) ──
+  {
+    id: "2800",
+    label: "Tracker Fund of Hong Kong (HKEX 2800)",
+    assetClass: "ETF",
+    custodyJurisdiction: "HongKong",
+    settlementSystem: "HongKong_Settlement",
+    assetType: "ETF",
+    jurisdiction: "HongKong",
+    exchange: "HKEX",
+    broker: "StandardChartered_HK",
+    ultimateCustodian: "HSBC",
+    settlementNetwork: ["CCASS", "FPS"],
+    beneficialOwnershipModel: "custodian",
+  },
+
+  // ── BTC cold wallet — decentralized rail, self-custody → OFAC NONE ──
+  {
+    id: "BTC_ColdWallet",
+    label: "BTC — cold wallet (self-custody)",
+    assetClass: "Crypto",
+    custodyJurisdiction: "NoCustody",
+    settlementSystem: "Decentralized_Settlement",
+    assetType: "Crypto",
+    jurisdiction: "NoCustody",
+    exchange: null,
+    broker: null,
+    ultimateCustodian: "SelfCustody",
+    settlementNetwork: ["Bitcoin"],
+    beneficialOwnershipModel: "self_custody",
+  },
+
+  // ── Physical gold bar in a DMCC vault — bearer, physical settlement → OFAC NONE ──
+  {
+    id: "Gold_DMCC",
+    label: "Physical gold bar (DMCC Dubai vault)",
+    assetClass: "PhysicalGold",
+    custodyJurisdiction: "DMCC_Dubai",
+    settlementSystem: "Physical_Gold_Settlement",
+    assetType: "PhysicalGold",
+    jurisdiction: "DMCC_Dubai",
+    exchange: null,
+    broker: null,
+    ultimateCustodian: "PhysicalPossession",
+    settlementNetwork: ["Physical"],
+    beneficialOwnershipModel: "bearer",
+  },
 ];

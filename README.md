@@ -1,8 +1,84 @@
-# 🧠 FINWAR v3.2 — Geopolitical War Engine
+# 🧠 FINWAR — Geopolitical Financial Threat Engine
 
-> A **multi-jurisdiction financial survival physics engine**. It models what happens to capital under **simultaneous US sanctions and Chinese capital controls** — dual-sovereignty collapse — at the level of the **custody chain**, not the asset label.
+> A **multi-jurisdiction financial threat simulation engine**. It models what happens to capital under **US sanctions, Chinese capital controls, banking-rail disruption, crypto crackdowns, and tax-transparency expansion** — at the level of the **custody chain / asset bucket**, not the asset label.
 
-FINWAR is **not** a portfolio optimizer and **not** a scoring system. It simulates *asset survival* when more than one sovereign attacks the financial rails at the same time.
+FINWAR is **not** a portfolio optimizer and **not** an advisory system. It models the **world**; it never sees a portfolio and never recommends an action.
+
+**▶ Live demo** (GitHub Pages — no install): **[Financial Kill-Chain v3.3](https://alexmorerich.github.io/finwar/terrain.html)** · [v3.2 survival dashboard](https://alexmorerich.github.io/finwar/) · [self-contained demo](https://alexmorerich.github.io/finwar/demo.html)
+
+It ships in two layers:
+
+- **FinWar v4 — `WorldState` service** (`src/`): the contract-typed Cloudflare Worker that is the **TRUTH layer feeding the [FinOS](../finos) decision pipeline**. `POST /simulate → WorldState` (events × per-bucket asset risk × binding constraints). **Start here** — see the next section.
+- **FinWar v3.2/v3.3 — survival physics engine** (`engine/`): the original zero-dependency research engine (position-chain survival + v3.3 financial kill-chain) that supplies v4's risk calibration. Documented from "Core thesis" onward.
+
+---
+
+## FinWar v4 — the `WorldState` service (FinOS truth layer)
+
+FinWar v4 answers one question — **"what changed in the world?"** — and emits a **portfolio-INDEPENDENT** [`WorldState`](src/contracts/world_state.ts). FinOS joins that with a FinArk `PortfolioState` to produce advisory recommendations. FinWar itself emits **no buy/sell/transfer** and holds **no portfolio data**.
+
+```
+FinWar ──WorldState──►              ◄──PortfolioState── FinArk
+                         FinOS.decide
+                              ▼
+                        DecisionPacket   (recommendations live ONLY here)
+```
+
+### Output contract (non-negotiable — typed against the shared `contracts/`)
+
+`src/contracts/` is **copied byte-identical from finos** (single source of truth — do not fork the shapes). `assembleWorldState(input)` returns:
+
+```jsonc
+{
+  "timestamp": "2026-06-19T00:00:00.000Z", // caller-supplied; engine NEVER calls the clock
+  "scenario": "US-China financial escalation",
+  "probability": 0.35,
+  "geopolitical_events": [ { "id", "type", "region", "severity": 0.75, "description" } ],
+  "asset_risk_matrix": { "US_EQUITY": { "freeze_risk": 0.72, "regulatory_risk": 0.55, … }, … },
+  "constraints": [ { "type": "freeze", "scope": "US_EQUITY", "intensity": 0.64 }, … ]
+}
+```
+
+- **`geopolitical_events[].type`** ∈ `sanction · war · capital_control · tax_change · banking_restriction`.
+- **`asset_risk_matrix`** is keyed by **asset BUCKET** (a class, never a lot). All **8** buckets are always populated — the **7 FinOS derives from real holdings** (`US_EQUITY, HK_BROKERAGE, CN_ONSHORE, CRYPTO_COLD, USD_CASH, OFFSHORE_USD, REAL_ESTATE`) plus the optional `GOLD_PHYSICAL`. *A missing bucket ⇒ that holding scores 0 risk ⇒ no recommendation*, so none are ever omitted.
+- **`AssetRisk`** dims (each optional, 0–1): `freeze_risk · liquidity_risk · regulatory_risk · capital_control_risk · censorship_resistance` (the last is a **safety** dim — higher = safer; carried only by the self-sovereign havens).
+- **`constraints[].type`** ∈ `freeze · transfer_limit · reporting · tax`; **`intensity`** 0–1.
+
+### Constraint scoping (the FinOS-compatibility crux)
+
+FinOS matches a constraint to a holding when `scope` equals the holding's **bucket**, **`custody.jurisdiction`**, or **`exposure_tags.country`** (EXACT, case-sensitive). FinWar therefore emits **both**:
+
+1. **bucket-scoped** constraints (e.g. `freeze@US_EQUITY`, `transfer_limit@CN_ONSHORE`) — normalization-independent; they bite no matter how an upstream spells a jurisdiction; **and**
+2. **jurisdiction-scoped** constraints in the **canonical uppercase codes** FinOS's `decide()` switches on — `US · HK · CN · SG` (+ havens `CH · AE · self`).
+
+> **Normalization note.** FinArk's raw `data.json` currently uses long-form labels (`"USA"`, `"China"`, `"Hong Kong"`, `"Self-custody"`). FinOS's `decide()` switches on the **canonical** codes (`jurisdictionBucket` tests `j === "CN"`; havens are `CH/SG/AE`), and `finos/test/decide.test.ts` uses `US/HK/CN/self`. FinWar emits the canonical codes — a compliant FinArk worker is expected to normalize to them. Because FinWar **also** scopes by bucket, recommendations fire correctly **regardless** of that normalization.
+
+### Engine model (deterministic, clock-free)
+
+Six **pressure axes** (`us_sanction · cn_capital_control · hk_pressure · banking_disruption · crypto_crackdown · tax_transparency`) are set by a named **scenario** and then overridden by `macro_inputs`; each bucket reacts via a hand-calibrated weight table (`src/engine/model.ts`), fused with noisy-OR so every output stays in [0,1]. Calibration lineage: the v3.2 terrain nodes (OFAC/SAFE/CRS axis scores) + life-finance-os `sanctions_model.json` / `geo_resilience.json`.
+
+A free-form `scenario` string is preserved verbatim and **deterministically resolved** to the nearest canonical preset (`baseline · us_china_escalation · us_secondary_sanctions · global_banking_disruption · china_capital_controls · crypto_dislocation · tax_transparency_expansion`). Same `(scenario, macro_inputs, timestamp)` ⇒ identical `WorldState`.
+
+### API
+
+```
+POST /simulate  { scenario, macro_inputs?, timestamp?, seed? }  → WorldState
+GET  /state                                                     → latest WorldState
+GET  /health                                                    → liveness + reactive status
+GET  /                                                          → service description
+```
+
+State machine: `IDLE →(POST /simulate)→ SIMULATING →(complete)→ UPDATED →(observed)→ STABLE`. Auth: if `FINWAR_TOKEN` is set, `POST /simulate` requires `Authorization: Bearer <token>` (FinOS sends exactly this); reads stay public.
+
+```bash
+npm install
+npm run typecheck     # tsc --noEmit (output typed as WorldState)
+npm test              # WorldState unit tests + live FinOS decide() integration
+npm run dev           # wrangler dev  → http://localhost:8787
+npm run deploy        # wrangler deploy
+```
+
+The `npm test` suite includes a cross-repo acceptance test: a `/simulate` `WorldState` + a FinArk-shaped `PortfolioState`, fed into the **real** `finos/decide()`, must yield non-empty recommendations (auto-skips if the sibling `../finos` repo is absent).
 
 ---
 
@@ -32,9 +108,25 @@ This is why the engine **rejects** the old model:
 
 ```
 finwar/
+├── wrangler.jsonc                  ★ FinWar v4 Worker config (name: finwar, main: src/index.ts)
+├── tsconfig.json                   ★ NodeNext strict (scoped to src/ + test/)
+│
+├── src/                            ★ FinWar v4 — WorldState service (FinOS truth layer)
+│   ├── index.ts                    Worker: POST /simulate · GET /state · GET /health · GET /
+│   ├── state.ts                    reactive status machine + latest-WorldState cache
+│   ├── contracts/                  SHARED contract layer (byte-identical to finos — do not fork)
+│   │   ├── world_state.ts          the WorldState / WorldInput / AssetRisk / RiskBucket shapes
+│   │   ├── portfolio_state.ts      FinArk's PortfolioState (imported for the integration test)
+│   │   ├── decision_packet.ts      FinOS's DecisionPacket (for type-level cross-checks)
+│   │   └── index.ts                contract barrel
+│   └── engine/
+│       ├── model.ts                6 pressure axes → 8-bucket AssetRisk matrix (calibrated)
+│       ├── scenarios.ts            scenario library + deterministic string resolver + macro overrides
+│       └── assemble.ts             assembleWorldState(WorldInput) → WorldState (pure)
+│
 ├── index.html                      v3.2 UI — scenario toggles, phase selector, survival dashboard
 ├── demo.html                       self-contained v3.2 dashboard (double-click, offline)
-├── terrain.html                    3D Sovereign Risk Terrain — Risk Terrain / Battle Map / Point Cloud
+├── terrain.html                    Financial Kill-Chain — settlement→custody→asset net + 3D exposure cloud
 ├── data.json                       FACTS LAYER (positions only; no computed outputs)
 ├── package.json
 │
@@ -51,15 +143,19 @@ finwar/
 │   ├── simulation/
 │   │   ├── time_phases.js          T0 / T1 / T7 (§4)
 │   │   └── exit_engine.js          escape_window (§6/§7)
-│   └── terrain/                    3D sovereign-risk terrain engine
-│       ├── nodes.js                country / institution / asset reference scores
-│       ├── risk_engine.js          FSS (OFAC) · CCR (SAFE) · TAX (CRS) + point cloud
-│       ├── portfolio.js            the holder's AssetPosition[] (editable)
-│       └── terrain.js              CLI → point cloud + risk table
+│   └── terrain/                    v3.3 financial kill-chain engine (settlement → custody → asset)
+│       ├── nodes.js                settlement-network / custodian / jurisdiction / asset-class / ownership refs
+│       ├── risk_engine.js          ofacDependency engine (§3) → WarPath (§4) + scenario queries + migration (§6)
+│       ├── portfolio.js            §7 calibration assets (full Asset schema; no weights — §8)
+│       └── terrain.js              CLI → WarPaths + kill-chain risk map + §4 scenario queries
 │
-└── tests/
+├── test/                           ★ v4 TS suite (node --import tsx --test)
+│   ├── worldstate.test.ts          WorldState contract + engine invariants (15 checks)
+│   └── finos_integration.test.ts   live finos decide() acceptance (skips if ../finos absent)
+│
+└── tests/                          v3.2 legacy suite (zero-dep, `npm run test:legacy`)
     ├── golden.test.js              3 mandatory v3.2 golden cases (§9)
-    └── terrain.test.js             3D risk-engine validation (17 checks)
+    └── terrain.test.js             v3.3 kill-chain engine validation (43 checks)
 ```
 
 ---
@@ -180,7 +276,7 @@ Every result is fully **explainable** — `explanation_trace` (§11) states *why
 | 3 · IBKR US ETF (HK user) | CN/HK holder, US custodian | **TRAPPED** under US & dual |
 
 ```
-$ npm test
+$ npm run test:legacy
   ✓ TEST 1 · BTC self-custody → MOVEABLE under dual sanctions
   ✓ TEST 2 · Shenzhen real estate → FROZEN under CN_CAPITAL_LOCK
   ✓ TEST 3 · IBKR US ETF → TRAPPED under US_SANCTION
@@ -203,40 +299,53 @@ The engine reproduces the correct dual-sovereignty behavior: **US-only** traps t
 
 ---
 
-## 3D Sovereign Risk Terrain
+## Financial Kill-Chain (v3.3)
 
-A companion engine (`engine/terrain/`, viewer `terrain.html`) projects a real portfolio into **three sovereign-risk axes** and renders it as a navigable 3D landscape.
+A companion engine (`engine/terrain/`, viewer `terrain.html`) models financial war along a **settlement → custody → asset** kill chain. The conceptual shift (spec §8): don't ask *"where does the asset trade?"* — ask *"who ultimately holds the kill switch?"*. The true objects of simulation are **settlement networks** (DTCC/DTC/CHIPS/SWIFT · CDP/CCASS/CNSDC/CIPS) and **ultimate custodians** (State Street, BNY Mellon, HSBC, SelfCustody, PhysicalPossession) — never the listing label.
 
-| Axis | Force | Driver |
+Every holding is an [`Asset`](engine/terrain/portfolio.js) with three core axes + the deep kill-chain layers:
+
+| Axis | Field | Enum |
 | --- | --- | --- |
-| **X · FSS** | US financial sanctions (OFAC) | custody / venue / rail / issuer US-exposure |
-| **Y · CCR** | China capital controls (SAFE) | holder residency · RMB convertibility · outbound rail |
-| **Z · TAX** | CRS / global tax transparency | reporting jurisdiction + CRS exposure |
+| **A · Settlement system** | `settlementSystem` | `US_Settlement · Singapore_Settlement · HongKong_Settlement · China_Settlement · Decentralized_Settlement · Issuer_Crypto_Settlement · Physical_Gold_Settlement · Real_Estate_Settlement` |
+| **B · Custody jurisdiction** | `custodyJurisdiction` | `US · Singapore · HongKong · China · NoCustody · DMCC_Dubai` |
+| **C · Asset class** | `assetClass` | `Equity · ETF · Cash · PhysicalGold · RealEstate · Crypto` |
 
-Every holding is a 4-tuple — `assetType · custodyCountry · institution · weight` — scored against reference `CountryNode` / `InstitutionNode` / `AssetNode` tables:
+Deep layers: `settlementNetwork[]` (the actual rails — `DTCC · DTC · CHIPS · Fedwire · SWIFT · CDP · MEPS+ · PayNow · CCASS · FPS · CNSDC · CIPS · Bitcoin · Ethereum · TRON · Physical`), `ultimateCustodian`, `beneficialOwnershipModel` (`direct_register · custodian · nominee · self_custody · bearer`), plus `broker` / `exchange`.
+
+### OFAC dependency engine (spec §3) — replaces naive `CustodyCountry == US`
+`ofacDependency` ∈ `HIGH · MEDIUM · LOW · NONE`, computed from **`settlementNetwork` + `ultimateCustodian` only** (never the jurisdiction label):
+- **HIGH** — a US rail (`DTCC · DTC · CHIPS · Fedwire`) **or** a US custodian (`State Street · BNY Mellon · JPMorgan · Citibank`).
+- **MEDIUM** — USD-correspondent exposure (`SWIFT`, or a custodian like HSBC / Standard Chartered).
+- **NONE** — no compellable US-reachable intermediary (decentralized / physical rail **and** self / physical custody).
+- **LOW** — foreign rails/custodian inside the regulated system (everything else).
+
+> This is the whole point: **O87** and **S27** list on SGX and look Singaporean, but clear via `DTC`/`CHIPS` at **State Street** → `ofacDependency: HIGH`. **D05** trades on the *same exchange* yet stays `LOW` (CDP/MEPS+/PayNow, custodian CDP). **BTC** (self-custody) and **physical gold** (bearer) are `NONE`. *Not where it trades — who holds the kill switch.*
+
+### Kill-chain priority (spec §5)
+`SettlementNetwork → UltimateCustodian → BeneficialOwnershipModel → Broker → Exchange → Jurisdiction → (only then) CustodyCountry label`. Wars attack the rail and the custodian first; the listing label is the *least* significant signal.
+
+### Output — `WarPath` (spec §4) + the aggregate graph
+Each asset yields a [`WarPath`](engine/terrain/risk_engine.js): `{ ofacDependency, capitalControlExposure (0–100, CN lock), taxTransparencyExposure (0–100, CRS), settlementNetwork, ultimateCustodian, … }`. The engine answers the §4 scenario questions directly:
+- `assetsKilledBySanction(["DTCC","CHIPS"])` → **O87, S27, SGOV** (their settlement is cut).
+- `jurisdictionTrapsUnderCapitalControl()` → **HongKong**.
+- `assetsVisibleUnderCRS()` → the regulated book (everything except self-custody / bearer).
+
+`buildExposureGraph()` aggregates them into `ofac_distribution`, a `kill_chain_risk_map` (the dangerous rails / custodians / asset classes), and `dependency_edges` (`asset → custodian → settlement`).
+
+### Migration (spec §6 — NO data loss)
+`migrateLegacyPosition()` upgrades the old `{ assetType, custodyCountry, broker }` model: `assetClass` + `custodyJurisdiction` are mapped, `settlementSystem` / `ultimateCustodian` / `settlementNetwork` / `beneficialOwnershipModel` default to `Unknown`, `broker` is preserved, and the entire original record is kept verbatim under `_legacy`.
+
+### Two views
+- **⛓ Kill-Chain Graph** — a layered ①→②→③ network (settlement network → custodian → asset); red lines trace a freeze path from a sanctioned rail up through the custodian to your asset, while self-custody / physical chains stay green.
+- **☁ 3D Exposure Cloud** — each `WarPath` plotted at `(OFAC dependency, CN capital-lock, CRS)`.
+
+### Calibration set (spec §7)
+SGX/HK/US assets where the listing label and the real kill chain diverge. `ofac_distribution` is **`{ HIGH: 3, MEDIUM: 1, LOW: 1, NONE: 2 }`** — three SGX/US ETFs are US-cleared (HIGH), the HK Tracker Fund is USD-correspondent (MEDIUM), the pure-SG equity is LOW, and only self-custody BTC + bearer gold escape entirely.
 
 ```
-FSS = 0.5·country.sanctionRisk        + 0.3·institution.usExposure    + 0.2·asset.dtccRisk
-CCR = 0.5·country.capitalControlRisk  + 0.3·institution.chinaExposure + 0.2·(Cash?80:20)
-TAX = 0.5·country.taxTransparencyRisk + 0.3·institution.crsExposure   + 0.2·(Equity?70:30)
-height = (FSS + CCR + TAX) / 3
-```
-
-> **Self-custody zone.** The spec's four jurisdictions cannot represent a cold wallet — self-custodied keys belong to no custody jurisdiction — so a fifth `SelfCustody` zone is added, low on every axis. This is why BTC / USDT / USDC / XAUT land in the safe valley instead of being force-fit into a hostile jurisdiction.
-
-### Two display modes (+ a point cloud)
-- **🌋 Risk Terrain** — jet-colormap surface; warm peaks = where capital piles risk, cyan valley = self-custody escape zone.
-- **🗺 Battle Map** — grayscale relief board; snow plains = safe ground, dark ridges = hostile high-risk terrain, with topographic contour lines.
-- **☁ Point Cloud** — spec §6: each holding plotted at `(FSS, CCR, TAX)`, marker size = weight, colour = worst-axis badge.
-
-The surface is an additive Gaussian field over the OFAC×SAFE plane — risky clusters stack into peaks, the co-located cold-wallet positions sink a deep safe basin. Elevation is switchable (worst axis · composite · any single axis).
-
-### Modeled portfolio
-China-mainland tax resident / Chinese national: IBKR **GLDM** (paper gold, US-cleared), Singapore **DBS / OCBC / SC**, Hong Kong **HSBC / SC / BOCHK / Futu**, and a **cold wallet** (BTC / XAUT / USDT / USDC). The terrain's lesson is sharp: the dominant exposure is **CRS tax-transparency** (nearly the whole offshore book is reportable to China), the single sharpest spike is **GLDM on the OFAC axis (80.5)**, and the only low ground is **self-custody**.
-
-```
-$ node engine/terrain/terrain.js          # point cloud + risk table
-$ node tests/terrain.test.js              # 17 passed, 0 failed
+$ node engine/terrain/terrain.js          # WarPaths + kill-chain risk map + §4 scenario queries
+$ node tests/terrain.test.js              # 43 passed, 0 failed
 ```
 
 ---
@@ -244,30 +353,28 @@ $ node tests/terrain.test.js              # 17 passed, 0 failed
 ## Run it
 
 ```bash
-# Zero-setup demo — just open the file in a browser (self-contained, offline)
-open demo.html      # macOS · or double-click demo.html
+# ── FinWar v4 — WorldState service (the FinOS truth layer) ──
+npm install
+npm run typecheck   # tsc --noEmit (output typed as WorldState)
+npm test            # v4 WorldState suite + live finos decide() acceptance
+npm run dev         # wrangler dev → POST /simulate · GET /state · GET /health
 
-# 3D Sovereign Risk Terrain (Plotly via CDN — needs internet for the chart lib)
-open terrain.html   # Risk Terrain · Battle Map · Point Cloud
-
-# Golden tests + 3D risk-engine tests (zero dependencies)
-npm test            # node tests/golden.test.js && node tests/terrain.test.js
-
-# CLI simulation (pass any scenarios)
-npm run sim                                   # default: dual
-node engine/engine.js US_SANCTION
+# ── FinWar v3.2 — legacy survival engine (zero-dependency) ──
+npm run test:legacy # node tests/golden.test.js && node tests/terrain.test.js
+npm run sim                                   # CLI simulation (default: dual)
 node engine/engine.js US_SANCTION CN_CAPITAL_LOCK GLOBAL_COLLAPSE
 
-# Modular UI — local-first dashboard (needs an HTTP origin for ES modules + fetch)
-npm run serve       # python3 -m http.server 8080
-# → open http://localhost:8080
+# Financial Kill-Chain + zero-setup demo (open in a browser)
+# live:  https://alexmorerich.github.io/finwar/terrain.html   (GitHub Pages)
+open terrain.html   # Kill-Chain Graph · 3D Exposure Cloud (Plotly via CDN)
+open demo.html      # self-contained v3.2 dashboard (double-click, offline)
+npm run serve       # modular index.html → http://localhost:8080
 ```
 
-`demo.html` is a single self-contained file (engine + data inlined) you can open
-directly from disk — no server, no build. `index.html` is the modular version
-that imports `engine/*.js` and `fetch`es `data.json`, so it needs an HTTP origin.
-
-Requires **Node ≥ 18**. No build step, no npm dependencies — fully local-first.
+The **v4 service** (`src/`) needs `npm install` (TypeScript + wrangler) and **Node ≥ 20**.
+The **v3.2 engine** (`engine/`) and the HTML dashboards stay **zero-dependency** and
+fully local-first: `demo.html` inlines the engine + data (no server), while
+`index.html` imports `engine/*.js` and `fetch`es `data.json` (needs an HTTP origin).
 
 ---
 
