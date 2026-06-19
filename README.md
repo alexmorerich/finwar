@@ -198,6 +198,9 @@ The engine reproduces the correct dual-sovereignty behavior: **US-only** traps t
 ## Run it
 
 ```bash
+# Zero-setup demo — just open the file in a browser (self-contained, offline)
+open demo.html      # macOS · or double-click demo.html
+
 # Golden tests (zero dependencies)
 npm test            # or: node tests/golden.test.js
 
@@ -206,10 +209,14 @@ npm run sim                                   # default: dual
 node engine/engine.js US_SANCTION
 node engine/engine.js US_SANCTION CN_CAPITAL_LOCK GLOBAL_COLLAPSE
 
-# UI — local-first dashboard (needs an HTTP origin for ES modules + fetch)
+# Modular UI — local-first dashboard (needs an HTTP origin for ES modules + fetch)
 npm run serve       # python3 -m http.server 8080
 # → open http://localhost:8080
 ```
+
+`demo.html` is a single self-contained file (engine + data inlined) you can open
+directly from disk — no server, no build. `index.html` is the modular version
+that imports `engine/*.js` and `fetch`es `data.json`, so it needs an HTTP origin.
 
 Requires **Node ≥ 18**. No build step, no npm dependencies — fully local-first.
 

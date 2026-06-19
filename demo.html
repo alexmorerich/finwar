@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FINWAR v3.2 — Live Demo</title>
+<style>
+  :root {
+    --bg: #0a0e14; --panel: #121823; --panel2: #1a2230; --line: #232c3b;
+    --txt: #d7e0ee; --mut: #7c8aa0; --accent: #4da3ff;
+    --green: #2ec16b; --amber: #f0b429; --red: #ef4444;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.45;
+  }
+  header {
+    padding: 20px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  header .tag { color: var(--mut); font-size: 12.5px; }
+  .wrap { padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
+  .controls {
+    display: flex; gap: 26px; flex-wrap: wrap; align-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 20px;
+  }
+  .controls .grp { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls .lbl { color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin-right: 4px; }
+  .chip {
+    cursor: pointer; user-select: none; border: 1px solid var(--line);
+    background: var(--panel2); color: var(--txt); padding: 7px 13px;
+    border-radius: 8px; font-size: 13px; transition: .12s;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  .chip.phase.on { background: #2a3142; border-color: var(--accent); color: var(--txt); }
+  .dash {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 22px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  }
+  .stat .n { font-size: 26px; font-weight: 700; font-family: var(--mono); }
+  .stat .k { color: var(--mut); font-size: 12px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; border-left-width: 4px;
+  }
+  .card.MOVEABLE { border-left-color: var(--green); }
+  .card.TRAPPED { border-left-color: var(--amber); }
+  .card.FROZEN { border-left-color: var(--red); }
+  .card h3 { margin: 0 0 2px; font-size: 14.5px; }
+  .card .sub { color: var(--mut); font-size: 12px; font-family: var(--mono); }
+  .row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 10px; }
+  .klass { font-weight: 700; font-size: 13px; letter-spacing: .3px; }
+  .klass.MOVEABLE { color: var(--green); }
+  .klass.TRAPPED { color: var(--amber); }
+  .klass.FROZEN { color: var(--red); }
+  .bar { height: 7px; background: var(--panel2); border-radius: 5px; overflow: hidden; margin-top: 10px; }
+  .bar > i { display: block; height: 100%; border-radius: 5px; }
+  .meta { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; flex-wrap: wrap; }
+  .meta b { font-family: var(--mono); font-weight: 600; }
+  .meta .mut { color: var(--mut); display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; }
+  .phases { display: flex; gap: 6px; margin-top: 12px; }
+  .ph { flex: 1; text-align: center; padding: 6px 0; border-radius: 7px; background: var(--panel2); font-size: 11px; font-family: var(--mono); }
+  .ph .d { font-size: 9px; color: var(--mut); }
+  .ph.MOVEABLE { box-shadow: inset 0 -3px 0 var(--green); }
+  .ph.TRAPPED { box-shadow: inset 0 -3px 0 var(--amber); }
+  .ph.FROZEN { box-shadow: inset 0 -3px 0 var(--red); }
+  .vecs { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .vec { font-size: 10.5px; font-family: var(--mono); background: #2a1a1a; color: #ffb4b4; border: 1px solid #4a2a2a; padding: 2px 7px; border-radius: 6px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--mut); font-size: 12px; }
+  .trace { list-style: none; padding: 8px 0 0; margin: 0; }
+  .trace li { font-family: var(--mono); font-size: 11px; color: #b9c6da; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .empty { color: var(--mut); font-size: 12px; padding: 6px 0; }
+  footer { color: var(--mut); font-size: 11.5px; padding: 24px; text-align: center; border-top: 1px solid var(--line); margin-top: 24px; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-family: var(--mono); }
+  .banner { background: #11261a; border: 1px solid #1f4d33; color: #9fe7bf; font-size: 12px; padding: 8px 14px; border-radius: 9px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 FINWAR <span style="color:var(--accent)">v3.2</span> · live demo</h1>
+  <span class="tag">multi-jurisdiction financial survival physics engine · position-chain model · dual-sovereignty stress test</span>
+</header>
+
+<div class="wrap">
+  <div class="banner">✔ Self-contained single file — engine + data inlined. Toggle scenarios and the time phase; assets re-simulate live in your browser. No server required.</div>
+  <div id="root"></div>
+  <footer>
+    Heuristic stress model — not investment, legal, or tax advice. Survival = ∏ freeze-vector impacts, never <code>min(SRS,CCR)</code>.
+    Canonical engine &amp; tests: <code>engine/</code> + <code>tests/golden.test.js</code> in the repo.
+  </footer>
+</div>
+
+<script>
+/* ============================================================================
+   FINWAR v3.2 — self-contained build. This inlines a faithful copy of the
+   golden-tested engine modules (engine/core, engine/scenario, engine/simulation)
+   so the page runs from file:// with no imports and no fetch. The repo's
+   engine/*.js remain the source of truth; this file is a presentation bundle.
+   ============================================================================ */
+
+// ---- engine/core/custody.js ----
+const CUSTODY_RESILIENCE = {
+  self_custody: 0.95, bearer: 0.85, custodied: 0.40,
+  bank_deposit: 0.20, registered_broker: 0.10, registered: 0.05,
+};
+function custodyResilience(mode) {
+  if (!(mode in CUSTODY_RESILIENCE)) throw new Error("Unknown custody_mode: " + mode);
+  return CUSTODY_RESILIENCE[mode];
+}
+
+// ---- engine/simulation/time_phases.js ----
+const PHASES = ["T0", "T1", "T7"];
+const PHASE_DAYS = { T0: 0, T1: 1, T7: 7 };
+function phaseDay(p) { const d = PHASE_DAYS[p]; if (d === undefined) throw new Error("Unknown phase: " + p); return d; }
+function phaseLte(a, b) { return phaseDay(a) <= phaseDay(b); }
+
+// ---- engine/scenario/freeze_vectors.js ----
+const isUS = (x) => !!x && x.reg === "US";
+const VECTORS = {
+  custodian_reg: { id: "custodian_reg", scenario: "US_SANCTION", type: "seizure", active_from: "T1", severity: 0.55,
+    match: (p) => !!p.custodian && (p.custodian.reg === "US" || p.custodian.usd_clearing === true) },
+  venue_reg: { id: "venue_reg", scenario: "US_SANCTION", type: "market", active_from: "T0", severity: 0.85,
+    match: (p) => isUS(p.venue) },
+  rail_settlement: { id: "rail_settlement", scenario: "US_SANCTION", type: "seizure", active_from: "T7", severity: 0.70,
+    match: (p) => !!p.rail && (p.rail.settle === "CHIPS" || p.rail.settle === "SWIFT" || p.rail.settle === "Fedwire" || p.rail.currency === "USD") },
+  issuer_reg: { id: "issuer_reg", scenario: "US_SANCTION", type: "seizure", active_from: "T1", severity: 0.90,
+    match: (p) => isUS(p.issuer) },
+  holder_residency: { id: "holder_residency", scenario: "CN_CAPITAL_LOCK", type: "lock", active_from: "T1", severity: 0.45,
+    match: (p) => !!p.holder && p.holder.residency === "CN" },
+  currency_convertibility: { id: "currency_convertibility", scenario: "CN_CAPITAL_LOCK", type: "lock", active_from: "T0", severity: 0.40,
+    match: (p) => !!p.rail && (p.rail.currency === "CNY" || p.rail.currency === "RMB") },
+  outbound_rail: { id: "outbound_rail", scenario: "CN_CAPITAL_LOCK", type: "lock", active_from: "T0", severity: 0.40,
+    match: (p) => {
+      const onshoreSettle = !!p.rail && (p.rail.settle === "CNAPS" || p.rail.settle === "CIPS");
+      const onshoreCustody = !!p.custodian && p.custodian.reg === "CN";
+      return onshoreSettle || onshoreCustody;
+    } },
+  global_rail_degradation: { id: "global_rail_degradation", scenario: "GLOBAL_COLLAPSE", type: "seizure", active_from: "T1", severity: 0.55,
+    match: (p) => p.custody_mode !== "self_custody" && p.custody_mode !== "bearer" },
+};
+const ALL_VECTORS = Object.values(VECTORS);
+
+// ---- engine/scenario/scenarios.js ----
+const vectorsFor = (s) => ALL_VECTORS.filter((v) => v.scenario === s);
+const SCENARIOS = {
+  US_SANCTION: { name: "US_SANCTION", vectors: vectorsFor("US_SANCTION") },
+  CN_CAPITAL_LOCK: { name: "CN_CAPITAL_LOCK", vectors: vectorsFor("CN_CAPITAL_LOCK") },
+  GLOBAL_COLLAPSE: { name: "GLOBAL_COLLAPSE", vectors: vectorsFor("GLOBAL_COLLAPSE") },
+};
+const SCENARIO_NAMES = Object.keys(SCENARIOS);
+function getScenario(name) { const s = SCENARIOS[name]; if (!s) throw new Error("Unknown scenario: " + name); return s; }
+
+// ---- engine/scenario/compose.js ----
+function composeScenarios(names) {
+  const list = names.map(getScenario);
+  const seen = new Map();
+  for (const s of list) for (const v of s.vectors) if (!seen.has(v.id)) seen.set(v.id, v);
+  return { name: names.join(" + "), sources: names.slice(), vectors: [...seen.values()],
+    mode: names.length > 1 ? "dual_or_multi_blockade" : "single" };
+}
+
+// ---- engine/core/survival.js ----
+function effectiveImpact(severity, R) { return 1 - (1 - severity) * (1 - R); }
+function matchedVectors(position, composed) {
+  const R = custodyResilience(position.custody_mode);
+  const out = [];
+  for (const v of composed.vectors) if (v.match(position)) out.push({ ...v, eff: effectiveImpact(v.severity, R) });
+  return out;
+}
+function survivalAtPhase(matched, phase) {
+  let score = 1.0;
+  const active = matched.filter((v) => phaseLte(v.active_from, phase));
+  for (const v of active) score *= v.eff;
+  return { score, active };
+}
+
+// ---- engine/core/classifier.js ----
+function classify(score) { if (score > 0.7) return "MOVEABLE"; if (score >= 0.3) return "TRAPPED"; return "FROZEN"; }
+const CLASS_EMOJI = { MOVEABLE: "🟢", TRAPPED: "🟡", FROZEN: "🔴" };
+function degradationBand(score) {
+  if (score >= 0.8) return "fully_moveable"; if (score >= 0.5) return "degraded";
+  if (score >= 0.2) return "trapped"; return "frozen";
+}
+
+// ---- engine/simulation/exit_engine.js ----
+function exitAnalysis(matched, time_to_liquidate) {
+  let time_to_freeze = Infinity;
+  for (const v of matched) { const d = phaseDay(v.active_from); if (d < time_to_freeze) time_to_freeze = d; }
+  const escape_window = time_to_freeze - time_to_liquidate;
+  return { time_to_liquidate, time_to_freeze, escape_window, escape_possible: escape_window > 0 };
+}
+
+// ---- engine/engine.js ----
+const round = (x) => Math.round(x * 1000) / 1000;
+function traceLine(v) {
+  const verb = v.type === "lock" ? "locked by" : v.type === "market" ? "halted by" : "matched";
+  return v.id + " " + verb + " " + v.scenario + " (" + v.type + ", activates " + v.active_from + ") → survival ×" + round(v.eff);
+}
+function simulateAsset(asset, scenarioNames) {
+  const composed = composeScenarios(scenarioNames);
+  const matched = matchedVectors(asset.position, composed);
+  const phases = {};
+  for (const p of PHASES) {
+    const { score, active } = survivalAtPhase(matched, p);
+    const klass = classify(score);
+    phases[p] = { phase: p, day: PHASE_DAYS[p], survival_score: round(score), classification: klass,
+      emoji: CLASS_EMOJI[klass], degradation_band: degradationBand(score),
+      frozen_vectors: active.map((v) => v.id), explanation_trace: active.map(traceLine) };
+  }
+  const exit = exitAnalysis(matched, asset.time_to_liquidate);
+  const final = phases.T7;
+  return { asset_id: asset.id, label: asset.label, custody_mode: asset.position.custody_mode,
+    scenario: composed.name, mode: composed.mode, base: { base_srs: asset.base_srs, base_ccr: asset.base_ccr },
+    survival_score: final.survival_score, classification: final.classification, emoji: final.emoji,
+    escape_window: exit.escape_window, frozen_vectors: final.frozen_vectors,
+    explanation_trace: final.explanation_trace, exit, phases };
+}
+function simulateAll(assets, scenarioNames) { return assets.map((a) => simulateAsset(a, scenarioNames)); }
+
+/* ============================ inlined data.json ============================ */
+const ASSETS = [
+  { id: "btc_self_custody", label: "BTC — self-custody (hardware wallet)", base_srs: 5, base_ccr: 8, time_to_liquidate: 0.02,
+    position: { holder: { citizenship: "CN", residency: "HK" }, custodian: null, rail: { currency: "BTC", settle: "blockchain" }, issuer: null, venue: null, custody_mode: "self_custody" } },
+  { id: "shenzhen_real_estate", label: "Shenzhen residential real estate", base_srs: 15, base_ccr: 95, time_to_liquidate: 90,
+    position: { holder: { citizenship: "CN", residency: "CN" }, custodian: { entity: "PRC Real Property Registry", reg: "CN", usd_clearing: false }, rail: { currency: "CNY", settle: "CNAPS" }, issuer: null, venue: null, custody_mode: "registered" } },
+  { id: "ibkr_us_etf_hk", label: "iShares IVV (US ETF) at IBKR — HK resident", base_srs: 70, base_ccr: 45, time_to_liquidate: 1,
+    position: { holder: { citizenship: "CN", residency: "HK" }, custodian: { entity: "IBKR", reg: "US", usd_clearing: true }, rail: { currency: "USD", settle: "CHIPS" }, issuer: { name: "BlackRock", reg: "US" }, venue: { exchange: "NYSE", reg: "US" }, custody_mode: "custodied" } },
+  { id: "gold_bearer_hk", label: "Physical gold — bearer (HK private vault)", base_srs: 10, base_ccr: 20, time_to_liquidate: 2,
+    position: { holder: { citizenship: "CN", residency: "HK" }, custodian: null, rail: { currency: "XAU", settle: "physical" }, issuer: null, venue: null, custody_mode: "bearer" } },
+  { id: "usdt_binance", label: "USDT on Binance (custodied exchange balance)", base_srs: 45, base_ccr: 30, time_to_liquidate: 0.1,
+    position: { holder: { citizenship: "CN", residency: "HK" }, custodian: { entity: "Binance", reg: "offshore", usd_clearing: true }, rail: { currency: "USDT", settle: "blockchain" }, issuer: { name: "Tether", reg: "offshore" }, venue: { exchange: "Binance", reg: "offshore" }, custody_mode: "custodied" } },
+  { id: "icbc_rmb_deposit", label: "RMB demand deposit at ICBC (mainland)", base_srs: 20, base_ccr: 85, time_to_liquidate: 0.5,
+    position: { holder: { citizenship: "CN", residency: "CN" }, custodian: { entity: "ICBC", reg: "CN", usd_clearing: false }, rail: { currency: "CNY", settle: "CNAPS" }, issuer: null, venue: null, custody_mode: "bank_deposit" } },
+  { id: "ust_ibkr_hk", label: "US Treasury bond at IBKR — HK resident", base_srs: 75, base_ccr: 40, time_to_liquidate: 1,
+    position: { holder: { citizenship: "CN", residency: "HK" }, custodian: { entity: "IBKR", reg: "US", usd_clearing: true }, rail: { currency: "USD", settle: "Fedwire" }, issuer: { name: "US Treasury", reg: "US" }, venue: { exchange: "OTC", reg: "US" }, custody_mode: "custodied" } },
+];
+
+/* ================================ UI ================================ */
+const COLOR = { MOVEABLE: "var(--green)", TRAPPED: "var(--amber)", FROZEN: "var(--red)" };
+const state = { scenarios: new Set(["US_SANCTION", "CN_CAPITAL_LOCK"]), phase: "T7" };
+const root = document.getElementById("root");
+
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function fmtEsc(w) { return w === Infinity ? "∞" : w + "d"; }
+function chainSummary(p) {
+  const parts = [];
+  if (p.holder) parts.push(p.holder.citizenship + "/" + p.holder.residency);
+  if (p.custodian) parts.push(p.custodian.entity + "(" + p.custodian.reg + ")"); else parts.push("no-custodian");
+  if (p.rail) parts.push(p.rail.currency + "·" + p.rail.settle);
+  return parts.join(" → ");
+}
+function stat(n, k, c) { return '<div class="stat"><div class="n" style="color:' + c + '">' + n + '</div><div class="k">' + k + "</div></div>"; }
+function controlsHTML() {
+  const sc = SCENARIO_NAMES.map((nm) => '<span class="chip scenario ' + (state.scenarios.has(nm) ? "on" : "") + '" data-s="' + nm + '">' + nm + "</span>").join("");
+  const ph = PHASES.map((p) => '<span class="chip phase ' + (state.phase === p ? "on" : "") + '" data-p="' + p + '">' + p + " · d" + PHASE_DAYS[p] + "</span>").join("");
+  return '<div class="controls"><div class="grp"><span class="lbl">Scenarios</span>' + sc + '</div><div class="grp"><span class="lbl">Time phase</span>' + ph + "</div></div>";
+}
+function cardHTML(r) {
+  const a = ASSETS.find((x) => x.id === r.asset_id);
+  const cur = r.cur, k = cur.classification, pct = Math.round(cur.survival_score * 100);
+  const phStrip = PHASES.map((p) => { const c = r.phases[p].classification; return '<div class="ph ' + c + '">' + p + '<div class="d">' + r.phases[p].survival_score + "</div></div>"; }).join("");
+  const vecs = (cur.frozen_vectors || []).map((v) => '<span class="vec">' + esc(v) + "</span>").join("");
+  const trace = cur.explanation_trace || [];
+  return '<div class="card ' + k + '"><h3>' + r.emoji + " " + esc(r.label) + '</h3>' +
+    '<div class="sub">' + esc(chainSummary(a.position)) + "</div>" +
+    '<div class="row"><span class="klass ' + k + '">' + k + '</span><span style="font-family:var(--mono);font-size:18px;font-weight:700;color:' + COLOR[k] + '">' + cur.survival_score + "</span></div>" +
+    '<div class="bar"><i style="width:' + pct + "%;background:" + COLOR[k] + '"></i></div>' +
+    '<div class="meta"><div><span class="mut">custody</span><b>' + esc(r.custody_mode) + "</b></div>" +
+    '<div><span class="mut">escape window</span><b style="color:' + (r.exit.escape_window > 0 ? "var(--green)" : "var(--red)") + '">' + fmtEsc(r.exit.escape_window) + "</b></div>" +
+    '<div><span class="mut">time→freeze</span><b>' + fmtEsc(r.exit.time_to_freeze) + "</b></div></div>" +
+    '<div class="phases">' + phStrip + "</div>" +
+    (vecs ? '<div class="vecs">' + vecs + "</div>" : '<div class="empty">No freeze vectors hit this chain.</div>') +
+    (trace.length ? "<details><summary>explanation trace (" + trace.length + ")</summary><ul class=\"trace\">" + trace.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul></details>" : "") +
+    "</div>";
+}
+function render() {
+  const active = SCENARIO_NAMES.filter((n) => state.scenarios.has(n));
+  let rows;
+  if (active.length) rows = simulateAll(ASSETS, active);
+  else rows = ASSETS.map((a) => ({ asset_id: a.id, label: a.label, custody_mode: a.position.custody_mode, emoji: "🟢",
+    exit: { escape_window: Infinity, time_to_freeze: Infinity },
+    phases: Object.fromEntries(PHASES.map((p) => [p, { classification: "MOVEABLE", survival_score: 1, frozen_vectors: [], explanation_trace: [] }])) }));
+  rows.forEach((r) => { r.cur = r.phases[state.phase]; });
+  rows.sort((a, b) => a.cur.survival_score - b.cur.survival_score);
+  const n = rows.length || 1;
+  const cnt = (k) => rows.filter((r) => r.cur.classification === k).length;
+  const escapable = rows.filter((r) => r.exit.escape_window > 0).length;
+  root.innerHTML = controlsHTML() +
+    '<div class="dash">' +
+      stat(cnt("MOVEABLE"), "🟢 moveable", "var(--green)") +
+      stat(cnt("TRAPPED"), "🟡 trapped", "var(--amber)") +
+      stat(cnt("FROZEN"), "🔴 frozen", "var(--red)") +
+      stat(Math.round((escapable / n) * 100) + "%", "escape-capable", "var(--accent)") +
+      stat(Math.round((cnt("FROZEN") / n) * 100) + "%", "frozen capital", "var(--mut)") +
+    '</div><div class="grid">' + rows.map(cardHTML).join("") + "</div>";
+  root.querySelectorAll(".chip.scenario").forEach((el) => el.addEventListener("click", () => {
+    const s = el.dataset.s; state.scenarios.has(s) ? state.scenarios.delete(s) : state.scenarios.add(s); render();
+  }));
+  root.querySelectorAll(".chip.phase").forEach((el) => el.addEventListener("click", () => { state.phase = el.dataset.p; render(); }));
+}
+render();
+</script>
+</body>
+</html>
