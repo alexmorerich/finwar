@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FINWAR v3.2 — Geopolitical War Engine</title>
+<style>
+  :root {
+    --bg: #0a0e14; --panel: #121823; --panel2: #1a2230; --line: #232c3b;
+    --txt: #d7e0ee; --mut: #7c8aa0; --accent: #4da3ff;
+    --green: #2ec16b; --amber: #f0b429; --red: #ef4444;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.45;
+  }
+  header {
+    padding: 20px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  header .tag { color: var(--mut); font-size: 12.5px; }
+  .wrap { padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
+  .controls {
+    display: flex; gap: 26px; flex-wrap: wrap; align-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 20px;
+  }
+  .controls .grp { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls .lbl { color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin-right: 4px; }
+  .chip {
+    cursor: pointer; user-select: none; border: 1px solid var(--line);
+    background: var(--panel2); color: var(--txt); padding: 7px 13px;
+    border-radius: 8px; font-size: 13px; transition: .12s;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  .chip.phase.on { background: #2a3142; border-color: var(--accent); color: var(--txt); }
+  .dash {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 22px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  }
+  .stat .n { font-size: 26px; font-weight: 700; font-family: var(--mono); }
+  .stat .k { color: var(--mut); font-size: 12px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; border-left-width: 4px;
+  }
+  .card.MOVEABLE { border-left-color: var(--green); }
+  .card.TRAPPED { border-left-color: var(--amber); }
+  .card.FROZEN { border-left-color: var(--red); }
+  .card h3 { margin: 0 0 2px; font-size: 14.5px; }
+  .card .sub { color: var(--mut); font-size: 12px; font-family: var(--mono); }
+  .row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 10px; }
+  .klass { font-weight: 700; font-size: 13px; letter-spacing: .3px; }
+  .klass.MOVEABLE { color: var(--green); }
+  .klass.TRAPPED { color: var(--amber); }
+  .klass.FROZEN { color: var(--red); }
+  .bar { height: 7px; background: var(--panel2); border-radius: 5px; overflow: hidden; margin-top: 10px; }
+  .bar > i { display: block; height: 100%; border-radius: 5px; }
+  .meta { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; flex-wrap: wrap; }
+  .meta b { font-family: var(--mono); font-weight: 600; }
+  .meta .mut { color: var(--mut); display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; }
+  .phases { display: flex; gap: 6px; margin-top: 12px; }
+  .ph { flex: 1; text-align: center; padding: 6px 0; border-radius: 7px; background: var(--panel2); font-size: 11px; font-family: var(--mono); }
+  .ph .d { font-size: 9px; color: var(--mut); }
+  .ph.MOVEABLE { box-shadow: inset 0 -3px 0 var(--green); }
+  .ph.TRAPPED { box-shadow: inset 0 -3px 0 var(--amber); }
+  .ph.FROZEN { box-shadow: inset 0 -3px 0 var(--red); }
+  .vecs { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .vec { font-size: 10.5px; font-family: var(--mono); background: #2a1a1a; color: #ffb4b4; border: 1px solid #4a2a2a; padding: 2px 7px; border-radius: 6px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--mut); font-size: 12px; }
+  .trace { list-style: none; padding: 8px 0 0; margin: 0; }
+  .trace li { font-family: var(--mono); font-size: 11px; color: #b9c6da; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .empty { color: var(--mut); font-size: 12px; padding: 6px 0; }
+  footer { color: var(--mut); font-size: 11.5px; padding: 24px; text-align: center; border-top: 1px solid var(--line); margin-top: 24px; }
+  .err { background: #2a1414; border: 1px solid #5a2a2a; color: #ffc0c0; padding: 16px; border-radius: 10px; font-size: 13px; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 FINWAR <span style="color:var(--accent)">v3.2</span></h1>
+  <span class="tag">multi-jurisdiction financial survival physics engine · position-chain model · dual-sovereignty stress test</span>
+</header>
+
+<div class="wrap">
+  <div id="root"><div class="err" id="boot">Loading engine…</div></div>
+  <footer>
+    Heuristic stress model — not investment, legal, or tax advice. Severities are illustrative and configurable in
+    <code>engine/scenario/freeze_vectors.js</code>. Survival = ∏ freeze-vector impacts, never <code>min(SRS,CCR)</code>.
+  </footer>
+</div>
+
+<script type="module">
+import { simulateAll } from "./engine/engine.js";
+import { SCENARIO_NAMES } from "./engine/scenario/scenarios.js";
+import { PHASES, PHASE_DAYS } from "./engine/simulation/time_phases.js";
+
+const COLOR = { MOVEABLE: "var(--green)", TRAPPED: "var(--amber)", FROZEN: "var(--red)" };
+const state = { scenarios: new Set(["US_SANCTION", "CN_CAPITAL_LOCK"]), phase: "T7" };
+let ASSETS = [];
+
+const root = document.getElementById("root");
+
+async function boot() {
+  try {
+    const res = await fetch("./data.json");
+    if (!res.ok) throw new Error(`data.json ${res.status}`);
+    ASSETS = (await res.json()).assets;
+    render();
+  } catch (e) {
+    root.innerHTML = `<div class="err"><b>Could not load data.json.</b><br/>
+      ES modules + fetch need an HTTP origin — open over a local server, not file://:<br/><br/>
+      <code>cd finwar &amp;&amp; python3 -m http.server 8080</code> &nbsp;then visit&nbsp; <code>http://localhost:8080</code><br/><br/>
+      <span style="color:var(--mut)">(${e.message})</span></div>`;
+  }
+}
+
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function fmtEsc(w) { return w === Infinity ? "∞" : `${w}d`; }
+function chainSummary(p) {
+  const parts = [];
+  if (p.holder) parts.push(`${p.holder.citizenship}/${p.holder.residency}`);
+  if (p.custodian) parts.push(`${p.custodian.entity}(${p.custodian.reg})`); else parts.push("no-custodian");
+  if (p.rail) parts.push(`${p.rail.currency}·${p.rail.settle}`);
+  return parts.join(" → ");
+}
+
+function render() {
+  const names = SCENARIO_NAMES.filter(n => state.scenarios.has(n));
+  const active = names.length ? names : [];
+  const rows = active.length
+    ? simulateAll(ASSETS, active)
+    : ASSETS.map(a => ({ asset_id: a.id, label: a.label, custody_mode: a.position.custody_mode,
+        survival_score: 1, escape_window: Infinity, frozen_vectors: [],
+        phases: Object.fromEntries(PHASES.map(p => [p, { classification: "MOVEABLE", survival_score: 1 }])),
+        exit: { escape_window: Infinity }, _peace: true,
+        get _cur() { return this.phases[state.phase]; } }));
+
+  rows.forEach(r => { r.cur = r.phases[state.phase]; });
+  rows.sort((a, b) => a.cur.survival_score - b.cur.survival_score);
+
+  const n = rows.length || 1;
+  const cnt = k => rows.filter(r => r.cur.classification === k).length;
+  const escapable = rows.filter(r => r.exit.escape_window > 0).length;
+
+  root.innerHTML = `
+    ${controlsHTML()}
+    <div class="dash">
+      ${stat(cnt("MOVEABLE"), "🟢 moveable", "var(--green)")}
+      ${stat(cnt("TRAPPED"), "🟡 trapped", "var(--amber)")}
+      ${stat(cnt("FROZEN"), "🔴 frozen", "var(--red)")}
+      ${stat(`${Math.round(escapable / n * 100)}%`, "escape-capable", "var(--accent)")}
+      ${stat(`${Math.round(cnt("FROZEN") / n * 100)}%`, "frozen capital", "var(--mut)")}
+    </div>
+    <div class="grid">${rows.map(cardHTML).join("")}</div>`;
+
+  wireControls();
+}
+
+function stat(n, k, c) {
+  return `<div class="stat"><div class="n" style="color:${c}">${n}</div><div class="k">${k}</div></div>`;
+}
+
+function controlsHTML() {
+  const sc = SCENARIO_NAMES.map(nm =>
+    `<span class="chip scenario ${state.scenarios.has(nm) ? "on" : ""}" data-s="${nm}">${nm}</span>`).join("");
+  const ph = PHASES.map(p =>
+    `<span class="chip phase ${state.phase === p ? "on" : ""}" data-p="${p}">${p} · d${PHASE_DAYS[p]}</span>`).join("");
+  return `<div class="controls">
+    <div class="grp"><span class="lbl">Scenarios</span>${sc}</div>
+    <div class="grp"><span class="lbl">Time phase</span>${ph}</div>
+  </div>`;
+}
+
+function cardHTML(r) {
+  const a = ASSETS.find(x => x.id === r.asset_id);
+  const cur = r.cur;
+  const k = cur.classification;
+  const pct = Math.round(cur.survival_score * 100);
+  const phStrip = PHASES.map(p => {
+    const c = r.phases[p].classification;
+    return `<div class="ph ${c}">${p}<div class="d">${r.phases[p].survival_score}</div></div>`;
+  }).join("");
+  const vecs = (cur.frozen_vectors || []).map(v => `<span class="vec">${esc(v)}</span>`).join("");
+  const trace = (cur.explanation_trace || []);
+  return `<div class="card ${k}">
+    <h3>${r._peace ? "🟢 " : r.emoji + " "}${esc(r.label)}</h3>
+    <div class="sub">${esc(chainSummary(a.position))}</div>
+    <div class="row">
+      <span class="klass ${k}">${k}</span>
+      <span style="font-family:var(--mono);font-size:18px;font-weight:700;color:${COLOR[k]}">${cur.survival_score}</span>
+    </div>
+    <div class="bar"><i style="width:${pct}%;background:${COLOR[k]}"></i></div>
+    <div class="meta">
+      <div><span class="mut">custody</span><b>${esc(r.custody_mode)}</b></div>
+      <div><span class="mut">escape window</span><b style="color:${r.exit.escape_window > 0 ? "var(--green)" : "var(--red)"}">${fmtEsc(r.exit.escape_window)}</b></div>
+      <div><span class="mut">time→freeze</span><b>${fmtEsc(r.exit.time_to_freeze === undefined ? Infinity : r.exit.time_to_freeze)}</b></div>
+    </div>
+    <div class="phases">${phStrip}</div>
+    ${vecs ? `<div class="vecs">${vecs}</div>` : `<div class="empty">No freeze vectors hit this chain.</div>`}
+    ${trace.length ? `<details><summary>explanation trace (${trace.length})</summary>
+      <ul class="trace">${trace.map(t => `<li>${esc(t)}</li>`).join("")}</ul></details>` : ""}
+  </div>`;
+}
+
+function wireControls() {
+  root.querySelectorAll(".chip.scenario").forEach(el =>
+    el.addEventListener("click", () => {
+      const s = el.dataset.s;
+      state.scenarios.has(s) ? state.scenarios.delete(s) : state.scenarios.add(s);
+      render();
+    }));
+  root.querySelectorAll(".chip.phase").forEach(el =>
+    el.addEventListener("click", () => { state.phase = el.dataset.p; render(); }));
+}
+
+boot();
+</script>
+</body>
+</html>

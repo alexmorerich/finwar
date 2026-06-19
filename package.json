@@ -1,0 +1,13 @@
+{
+  "name": "finwar",
+  "version": "3.2.0",
+  "description": "FINWAR v3.2 — multi-jurisdiction financial survival physics engine (US sanctions × China capital controls, dual-direction).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node tests/golden.test.js",
+    "sim": "node engine/engine.js",
+    "serve": "python3 -m http.server 8080"
+  },
+  "engines": { "node": ">=18" }
+}

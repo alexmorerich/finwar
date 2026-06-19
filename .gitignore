@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+history/
+backup/
+.playwright-mcp/
+finwar-dual.png

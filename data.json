@@ -1,0 +1,114 @@
+{
+  "_meta": {
+    "schema": "finwar.v3.2.data",
+    "note": "FACTS LAYER ONLY. Spec §10 data contract: base_srs, base_ccr, custody_mode, position-chain fields, and time-based liquidity params only. MUST NOT contain FSS, survival_score, classification, or any scenario output — those are computed by the engine.",
+    "custody_modes": ["self_custody", "bearer", "custodied", "bank_deposit", "registered_broker", "registered"]
+  },
+  "assets": [
+    {
+      "id": "btc_self_custody",
+      "label": "BTC — self-custody (hardware wallet)",
+      "base_srs": 5,
+      "base_ccr": 8,
+      "time_to_liquidate": 0.02,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "HK" },
+        "custodian": null,
+        "rail": { "currency": "BTC", "settle": "blockchain" },
+        "issuer": null,
+        "venue": null,
+        "custody_mode": "self_custody"
+      }
+    },
+    {
+      "id": "shenzhen_real_estate",
+      "label": "Shenzhen residential real estate",
+      "base_srs": 15,
+      "base_ccr": 95,
+      "time_to_liquidate": 90,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "CN" },
+        "custodian": { "entity": "PRC Real Property Registry", "reg": "CN", "usd_clearing": false },
+        "rail": { "currency": "CNY", "settle": "CNAPS" },
+        "issuer": null,
+        "venue": null,
+        "custody_mode": "registered"
+      }
+    },
+    {
+      "id": "ibkr_us_etf_hk",
+      "label": "iShares IVV (US ETF) at IBKR — HK resident",
+      "base_srs": 70,
+      "base_ccr": 45,
+      "time_to_liquidate": 1,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "HK" },
+        "custodian": { "entity": "IBKR", "reg": "US", "usd_clearing": true },
+        "rail": { "currency": "USD", "settle": "CHIPS" },
+        "issuer": { "name": "BlackRock", "reg": "US" },
+        "venue": { "exchange": "NYSE", "reg": "US" },
+        "custody_mode": "custodied"
+      }
+    },
+    {
+      "id": "gold_bearer_hk",
+      "label": "Physical gold — bearer (HK private vault)",
+      "base_srs": 10,
+      "base_ccr": 20,
+      "time_to_liquidate": 2,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "HK" },
+        "custodian": null,
+        "rail": { "currency": "XAU", "settle": "physical" },
+        "issuer": null,
+        "venue": null,
+        "custody_mode": "bearer"
+      }
+    },
+    {
+      "id": "usdt_binance",
+      "label": "USDT on Binance (custodied exchange balance)",
+      "base_srs": 45,
+      "base_ccr": 30,
+      "time_to_liquidate": 0.1,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "HK" },
+        "custodian": { "entity": "Binance", "reg": "offshore", "usd_clearing": true },
+        "rail": { "currency": "USDT", "settle": "blockchain" },
+        "issuer": { "name": "Tether", "reg": "offshore" },
+        "venue": { "exchange": "Binance", "reg": "offshore" },
+        "custody_mode": "custodied"
+      }
+    },
+    {
+      "id": "icbc_rmb_deposit",
+      "label": "RMB demand deposit at ICBC (mainland)",
+      "base_srs": 20,
+      "base_ccr": 85,
+      "time_to_liquidate": 0.5,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "CN" },
+        "custodian": { "entity": "ICBC", "reg": "CN", "usd_clearing": false },
+        "rail": { "currency": "CNY", "settle": "CNAPS" },
+        "issuer": null,
+        "venue": null,
+        "custody_mode": "bank_deposit"
+      }
+    },
+    {
+      "id": "ust_ibkr_hk",
+      "label": "US Treasury bond at IBKR — HK resident",
+      "base_srs": 75,
+      "base_ccr": 40,
+      "time_to_liquidate": 1,
+      "position": {
+        "holder": { "citizenship": "CN", "residency": "HK" },
+        "custodian": { "entity": "IBKR", "reg": "US", "usd_clearing": true },
+        "rail": { "currency": "USD", "settle": "Fedwire" },
+        "issuer": { "name": "US Treasury", "reg": "US" },
+        "venue": { "exchange": "OTC", "reg": "US" },
+        "custody_mode": "custodied"
+      }
+    }
+  ]
+}
