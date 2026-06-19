@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node tests/golden.test.js",
+    "test": "node tests/golden.test.js && node tests/terrain.test.js",
     "sim": "node engine/engine.js",
     "serve": "python3 -m http.server 8080"
   },

@@ -32,12 +32,14 @@ This is why the engine **rejects** the old model:
 
 ```
 finwar/
-├── index.html                      UI — scenario toggles, phase selector, survival dashboard
+├── index.html                      v3.2 UI — scenario toggles, phase selector, survival dashboard
+├── demo.html                       self-contained v3.2 dashboard (double-click, offline)
+├── terrain.html                    3D Sovereign Risk Terrain — Risk Terrain / Battle Map / Point Cloud
 ├── data.json                       FACTS LAYER (positions only; no computed outputs)
 ├── package.json
 │
 ├── engine/
-│   ├── engine.js                   orchestrator → spec §12 output bundle + CLI
+│   ├── engine.js                   v3.2 orchestrator → spec §12 output bundle + CLI
 │   ├── core/
 │   │   ├── custody.js              custody_mode → resilience (§3)
 │   │   ├── survival.js             multiplicative survival model (§2)
@@ -46,12 +48,18 @@ finwar/
 │   │   ├── freeze_vectors.js       per-link freeze vectors (§1)
 │   │   ├── scenarios.js            US_SANCTION · CN_CAPITAL_LOCK · GLOBAL_COLLAPSE
 │   │   └── compose.js              dual / multi-blockade composition (§5)
-│   └── simulation/
-│       ├── time_phases.js          T0 / T1 / T7 (§4)
-│       └── exit_engine.js          escape_window (§6/§7)
+│   ├── simulation/
+│   │   ├── time_phases.js          T0 / T1 / T7 (§4)
+│   │   └── exit_engine.js          escape_window (§6/§7)
+│   └── terrain/                    3D sovereign-risk terrain engine
+│       ├── nodes.js                country / institution / asset reference scores
+│       ├── risk_engine.js          FSS (OFAC) · CCR (SAFE) · TAX (CRS) + point cloud
+│       ├── portfolio.js            the holder's AssetPosition[] (editable)
+│       └── terrain.js              CLI → point cloud + risk table
 │
 └── tests/
-    └── golden.test.js              3 mandatory golden cases (§9)
+    ├── golden.test.js              3 mandatory v3.2 golden cases (§9)
+    └── terrain.test.js             3D risk-engine validation (17 checks)
 ```
 
 ---
@@ -195,14 +203,55 @@ The engine reproduces the correct dual-sovereignty behavior: **US-only** traps t
 
 ---
 
+## 3D Sovereign Risk Terrain
+
+A companion engine (`engine/terrain/`, viewer `terrain.html`) projects a real portfolio into **three sovereign-risk axes** and renders it as a navigable 3D landscape.
+
+| Axis | Force | Driver |
+| --- | --- | --- |
+| **X · FSS** | US financial sanctions (OFAC) | custody / venue / rail / issuer US-exposure |
+| **Y · CCR** | China capital controls (SAFE) | holder residency · RMB convertibility · outbound rail |
+| **Z · TAX** | CRS / global tax transparency | reporting jurisdiction + CRS exposure |
+
+Every holding is a 4-tuple — `assetType · custodyCountry · institution · weight` — scored against reference `CountryNode` / `InstitutionNode` / `AssetNode` tables:
+
+```
+FSS = 0.5·country.sanctionRisk        + 0.3·institution.usExposure    + 0.2·asset.dtccRisk
+CCR = 0.5·country.capitalControlRisk  + 0.3·institution.chinaExposure + 0.2·(Cash?80:20)
+TAX = 0.5·country.taxTransparencyRisk + 0.3·institution.crsExposure   + 0.2·(Equity?70:30)
+height = (FSS + CCR + TAX) / 3
+```
+
+> **Self-custody zone.** The spec's four jurisdictions cannot represent a cold wallet — self-custodied keys belong to no custody jurisdiction — so a fifth `SelfCustody` zone is added, low on every axis. This is why BTC / USDT / USDC / XAUT land in the safe valley instead of being force-fit into a hostile jurisdiction.
+
+### Two display modes (+ a point cloud)
+- **🌋 Risk Terrain** — jet-colormap surface; warm peaks = where capital piles risk, cyan valley = self-custody escape zone.
+- **🗺 Battle Map** — grayscale relief board; snow plains = safe ground, dark ridges = hostile high-risk terrain, with topographic contour lines.
+- **☁ Point Cloud** — spec §6: each holding plotted at `(FSS, CCR, TAX)`, marker size = weight, colour = worst-axis badge.
+
+The surface is an additive Gaussian field over the OFAC×SAFE plane — risky clusters stack into peaks, the co-located cold-wallet positions sink a deep safe basin. Elevation is switchable (worst axis · composite · any single axis).
+
+### Modeled portfolio
+China-mainland tax resident / Chinese national: IBKR **GLDM** (paper gold, US-cleared), Singapore **DBS / OCBC / SC**, Hong Kong **HSBC / SC / BOCHK / Futu**, and a **cold wallet** (BTC / XAUT / USDT / USDC). The terrain's lesson is sharp: the dominant exposure is **CRS tax-transparency** (nearly the whole offshore book is reportable to China), the single sharpest spike is **GLDM on the OFAC axis (80.5)**, and the only low ground is **self-custody**.
+
+```
+$ node engine/terrain/terrain.js          # point cloud + risk table
+$ node tests/terrain.test.js              # 17 passed, 0 failed
+```
+
+---
+
 ## Run it
 
 ```bash
 # Zero-setup demo — just open the file in a browser (self-contained, offline)
 open demo.html      # macOS · or double-click demo.html
 
-# Golden tests (zero dependencies)
-npm test            # or: node tests/golden.test.js
+# 3D Sovereign Risk Terrain (Plotly via CDN — needs internet for the chart lib)
+open terrain.html   # Risk Terrain · Battle Map · Point Cloud
+
+# Golden tests + 3D risk-engine tests (zero dependencies)
+npm test            # node tests/golden.test.js && node tests/terrain.test.js
 
 # CLI simulation (pass any scenarios)
 npm run sim                                   # default: dual

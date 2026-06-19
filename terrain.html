@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FINWAR 3D — Sovereign Risk Terrain</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    --bg: #05070d; --panel: #101622; --panel2: #18202e; --line: #232c3b;
+    --txt: #d7e0ee; --mut: #7c8aa0; --accent: #4da3ff;
+    --green: #2ec16b; --amber: #f0b429; --red: #ef4444;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.45; }
+  header { padding: 16px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-family: var(--mono); letter-spacing: 1px; color: var(--red); }
+  header .tag { color: var(--mut); font-size: 12px; }
+  header a { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .wrap { padding: 16px 22px; max-width: 1320px; margin: 0 auto; }
+  .controls { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .grp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lbl { color: var(--mut); font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; margin-right: 2px; }
+  .chip { cursor: pointer; user-select: none; border: 1px solid var(--line); background: var(--panel2); color: var(--txt);
+    padding: 7px 13px; border-radius: 8px; font-size: 13px; transition: .12s; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  #plot { width: 100%; height: 70vh; min-height: 520px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+  .plotnote { color: var(--mut); font-size: 11.5px; margin: 8px 2px 18px; }
+  .panel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 4px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; }
+  .stat .n { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+  .stat .k { color: var(--mut); font-size: 11.5px; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--mut); font-weight: 500; font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; }
+  td.num { font-family: var(--mono); text-align: right; }
+  .badge { font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 6px; }
+  .badge.HIGH { background: #2a1414; color: #ff9b9b; border: 1px solid #4a2a2a; }
+  .badge.MODERATE { background: #2a2410; color: #ffd98a; border: 1px solid #4a3f1f; }
+  .badge.LOW { background: #112619; color: #9fe7bf; border: 1px solid #1f4d33; }
+  footer { color: var(--mut); font-size: 11.5px; padding: 22px; text-align: center; border-top: 1px solid var(--line); margin-top: 22px; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-family: var(--mono); }
+  .err { background: #2a1414; border: 1px solid #5a2a2a; color: #ffc0c0; padding: 16px; border-radius: 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⬛ FINWAR · SOVEREIGN RISK TERRAIN</h1>
+  <span class="tag">3D risk physics · X=OFAC sanction · Y=SAFE capital-lock · Z=risk peak/loss</span>
+  <a href="./index.html">← v3.2 dashboard</a>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="grp"><span class="lbl">View</span>
+      <span class="chip mode on" data-mode="terrain">🌋 Risk Terrain</span>
+      <span class="chip mode" data-mode="battle">🗺 Battle Map</span>
+      <span class="chip mode" data-mode="cloud">☁ Point Cloud</span>
+    </div>
+    <div class="grp"><span class="lbl">Elevation</span>
+      <span class="chip elev on" data-elev="dominant_value">Worst axis</span>
+      <span class="chip elev" data-elev="height">Composite</span>
+      <span class="chip elev" data-elev="x_OFAC">OFAC</span>
+      <span class="chip elev" data-elev="y_SAFE">SAFE</span>
+      <span class="chip elev" data-elev="z_TAX">CRS-tax</span>
+    </div>
+    <div class="grp"><span class="lbl">Markers</span>
+      <span class="chip mk on" data-mk="on">assets</span>
+    </div>
+  </div>
+
+  <div id="plot"></div>
+  <div class="plotnote" id="plotnote"></div>
+
+  <div class="panel-grid" id="stats"></div>
+  <div id="tablewrap"></div>
+
+  <footer>
+    Heuristic stress model — not investment, legal, or tax advice. Surface = additive Gaussian risk field over the
+    OFAC×SAFE plane; risky clusters rise into peaks, self-custody sinks the safe valley. Canonical engine &amp; tests:
+    <code>engine/terrain/</code> + <code>tests/terrain.test.js</code>.
+  </footer>
+</div>
+
+<script>
+/* ======================================================================
+   FINWAR 3D — self-contained. Inlines engine/terrain/{nodes,risk_engine,
+   portfolio}.js (golden-tested) so the page runs from file:// (Plotly via CDN).
+   ====================================================================== */
+
+// ---- engine/terrain/nodes.js ----
+const COUNTRIES = {
+  US:            { name:"US",            sanctionRisk:90, capitalControlRisk:10, taxTransparencyRisk:80 },
+  Singapore:     { name:"Singapore",     sanctionRisk:40, capitalControlRisk:20, taxTransparencyRisk:70 },
+  HongKong:      { name:"HongKong",      sanctionRisk:50, capitalControlRisk:40, taxTransparencyRisk:60 },
+  ChinaMainland: { name:"ChinaMainland", sanctionRisk:20, capitalControlRisk:95, taxTransparencyRisk:30 },
+  SelfCustody:   { name:"SelfCustody",   sanctionRisk:25, capitalControlRisk:5,  taxTransparencyRisk:10 },
+};
+const INSTITUTIONS = {
+  IBKR:                { name:"IBKR",                country:"US",            usExposure:95, chinaExposure:10, crsExposure:75, counterpartyRisk:20 },
+  US_Bank:             { name:"US_Bank",             country:"US",            usExposure:95, chinaExposure:5,  crsExposure:80, counterpartyRisk:25 },
+  DBS:                 { name:"DBS",                 country:"Singapore",     usExposure:35, chinaExposure:25, crsExposure:90, counterpartyRisk:12 },
+  OCBC:                { name:"OCBC",                country:"Singapore",     usExposure:35, chinaExposure:25, crsExposure:90, counterpartyRisk:14 },
+  SC_SG:               { name:"SC_SG",               country:"Singapore",     usExposure:45, chinaExposure:35, crsExposure:90, counterpartyRisk:18 },
+  HSBC_HK:             { name:"HSBC_HK",             country:"HongKong",      usExposure:55, chinaExposure:55, crsExposure:88, counterpartyRisk:18 },
+  StandardCharteredHK: { name:"StandardCharteredHK", country:"HongKong",      usExposure:50, chinaExposure:50, crsExposure:88, counterpartyRisk:20 },
+  Futu:                { name:"Futu",                country:"HongKong",      usExposure:55, chinaExposure:70, crsExposure:82, counterpartyRisk:35 },
+  BOCHK:               { name:"BOCHK",               country:"HongKong",      usExposure:40, chinaExposure:88, crsExposure:80, counterpartyRisk:22 },
+  CN_Bank:             { name:"CN_Bank",             country:"ChinaMainland", usExposure:12, chinaExposure:98, crsExposure:45, counterpartyRisk:20 },
+  CN_Broker:           { name:"CN_Broker",           country:"ChinaMainland", usExposure:12, chinaExposure:96, crsExposure:45, counterpartyRisk:26 },
+  CryptoWallet:        { name:"CryptoWallet",        country:"SelfCustody",   usExposure:22, chinaExposure:6,  crsExposure:6,  counterpartyRisk:30 },
+};
+const ASSET_TYPES = {
+  RealEstate:{ assetType:"RealEstate", issuerRisk:30, dtccRisk:0,  liquidity:8,  volatility:25 },
+  Equity:    { assetType:"Equity",     issuerRisk:45, dtccRisk:90, liquidity:85, volatility:50 },
+  Gold:      { assetType:"Gold",       issuerRisk:25, dtccRisk:35, liquidity:70, volatility:35 },
+  Crypto:    { assetType:"Crypto",     issuerRisk:55, dtccRisk:12, liquidity:80, volatility:80 },
+  Cash:      { assetType:"Cash",       issuerRisk:18, dtccRisk:45, liquidity:96, volatility:5  },
+};
+
+// ---- engine/terrain/risk_engine.js ----
+const r1 = (x) => Math.round(x * 10) / 10;
+const computeFSS = (c, i, a) => 0.5*c.sanctionRisk + 0.3*i.usExposure + 0.2*a.dtccRisk;
+const computeCCR = (c, i, t) => 0.5*c.capitalControlRisk + 0.3*i.chinaExposure + 0.2*(t==="Cash"?80:20);
+const computeTAX = (c, i, t) => 0.5*c.taxTransparencyRisk + 0.3*i.crsExposure + 0.2*(t==="Equity"?70:30);
+function classifyByMax(v){ if(v>65) return "HIGH"; if(v>=45) return "MODERATE"; return "LOW"; }
+const RISK_EMOJI = { HIGH:"🔴", MODERATE:"🟡", LOW:"🟢" };
+function computePosition(pos){
+  const c = COUNTRIES[pos.custodyCountry], i = INSTITUTIONS[pos.institution], a = ASSET_TYPES[pos.assetType];
+  const FSS = computeFSS(c,i,a), CCR = computeCCR(c,i,pos.assetType), TAX = computeTAX(c,i,pos.assetType);
+  const height = (FSS+CCR+TAX)/3;
+  const axes = [{name:"OFAC",value:FSS},{name:"SAFE",value:CCR},{name:"CRS_TAX",value:TAX}];
+  const dominant = axes.reduce((p,q)=>q.value>p.value?q:p);
+  return { id:pos.id, x_OFAC:r1(FSS), y_SAFE:r1(CCR), z_TAX:r1(TAX), height:r1(height),
+    weight:pos.weight, dominant_axis:dominant.name, dominant_value:r1(dominant.value),
+    badge:classifyByMax(dominant.value), emoji:RISK_EMOJI[classifyByMax(dominant.value)],
+    label:`${pos.custodyCountry} / ${pos.institution} / ${pos.assetType} / ${Math.round(pos.weight*100)}%` };
+}
+
+// ---- engine/terrain/portfolio.js ----
+const PORTFOLIO = [
+  { id:"ibkr_gldm",  assetType:"Gold",   custodyCountry:"US",          institution:"IBKR",                weight:0.20 },
+  { id:"dbs_cash",   assetType:"Cash",   custodyCountry:"Singapore",   institution:"DBS",                 weight:0.08 },
+  { id:"ocbc_cash",  assetType:"Cash",   custodyCountry:"Singapore",   institution:"OCBC",                weight:0.07 },
+  { id:"scsg_cash",  assetType:"Cash",   custodyCountry:"Singapore",   institution:"SC_SG",               weight:0.05 },
+  { id:"hsbc_cash",  assetType:"Cash",   custodyCountry:"HongKong",    institution:"HSBC_HK",             weight:0.08 },
+  { id:"scbhk_cash", assetType:"Cash",   custodyCountry:"HongKong",    institution:"StandardCharteredHK", weight:0.05 },
+  { id:"bochk_cash", assetType:"Cash",   custodyCountry:"HongKong",    institution:"BOCHK",               weight:0.05 },
+  { id:"futu_eq",    assetType:"Equity", custodyCountry:"HongKong",    institution:"Futu",                weight:0.07 },
+  { id:"cw_btc",     assetType:"Crypto", custodyCountry:"SelfCustody", institution:"CryptoWallet",        weight:0.15 },
+  { id:"cw_xaut",    assetType:"Crypto", custodyCountry:"SelfCustody", institution:"CryptoWallet",        weight:0.07 },
+  { id:"cw_usdt",    assetType:"Crypto", custodyCountry:"SelfCustody", institution:"CryptoWallet",        weight:0.07 },
+  { id:"cw_usdc",    assetType:"Crypto", custodyCountry:"SelfCustody", institution:"CryptoWallet",        weight:0.06 },
+];
+const NAMES = { cw_btc:"BTC", cw_xaut:"XAUT", cw_usdt:"USDT", cw_usdc:"USDC" };
+
+const CLOUD = PORTFOLIO.map(computePosition);
+const centroid = (() => {
+  const w = CLOUD.reduce((s,p)=>s+p.weight,0)||1;
+  const acc = k => r1(CLOUD.reduce((s,p)=>s+p[k]*p.weight,0)/w);
+  return { x_OFAC:acc("x_OFAC"), y_SAFE:acc("y_SAFE"), z_TAX:acc("z_TAX"), height:acc("height") };
+})();
+
+/* ================= risk heightfield (additive Gaussian peaks) ================= */
+const GRID = 72, SIGMA = 11, BASELINE = 50, AMP = 1.5;
+function fieldPoints(valueKey){
+  return CLOUD.map(p => ({ x:p.x_OFAC, y:p.y_SAFE, a:(p[valueKey]-BASELINE)*AMP*(0.55+p.weight*4) }));
+}
+function fieldAt(pts, gx, gy){
+  let s = BASELINE;
+  for (const p of pts){ const d2=(gx-p.x)**2+(gy-p.y)**2; s += p.a*Math.exp(-d2/(2*SIGMA*SIGMA)); }
+  return s;
+}
+function heightfield(valueKey){
+  const pts = fieldPoints(valueKey);
+  const xs=[], ys=[];
+  for (let i=0;i<GRID;i++){ const t=i*100/(GRID-1); xs.push(t); ys.push(t); }
+  const z = ys.map(gy => xs.map(gx => fieldAt(pts, gx, gy)));
+  let zmin=Infinity, zmax=-Infinity;
+  for (const row of z) for (const v of row){ if(v<zmin)zmin=v; if(v>zmax)zmax=v; }
+  return { x:xs, y:ys, z, zmin, zmax, pts };
+}
+
+/* ================= colorscales ================= */
+const JET = "Jet";
+const SNOW = [
+  [0.00,"#eef1f4"],[0.18,"#dde3e8"],[0.38,"#b9c1c4"],[0.58,"#8b948c"],
+  [0.74,"#5f6a55"],[0.88,"#3c4430"],[1.00,"#232b1c"],
+];
+
+/* ================= traces ================= */
+function markerTrace(field, valueKey, dark){
+  // jitter co-located cold-wallet points into a small ring so all are visible
+  const groups = {};
+  CLOUD.forEach(p => { const k=p.x_OFAC+","+p.y_SAFE; (groups[k]=groups[k]||[]).push(p); });
+  const x=[],y=[],z=[],text=[],size=[],color=[];
+  const CB = { HIGH:"#ef4444", MODERATE:"#f0b429", LOW:"#2ec16b" };
+  CLOUD.forEach(p => {
+    const k=p.x_OFAC+","+p.y_SAFE, g=groups[k], idx=g.indexOf(p);
+    let jx=0,jy=0;
+    if (g.length>1){ const ang=idx/g.length*2*Math.PI; jx=Math.cos(ang)*4; jy=Math.sin(ang)*4; }
+    const px=p.x_OFAC+jx, py=p.y_SAFE+jy;
+    x.push(px); y.push(py); z.push(fieldAt(field.pts, p.x_OFAC, p.y_SAFE)+5);
+    const nm = NAMES[p.id] ? `${NAMES[p.id]} · ${p.label}` : p.label;
+    text.push(`<b>${nm}</b><br>OFAC ${p.x_OFAC} · SAFE ${p.y_SAFE} · CRS-tax ${p.z_TAX}`
+      + `<br>worst: ${p.dominant_axis} ${p.dominant_value} · ${p.badge} · wt ${Math.round(p.weight*100)}%`);
+    size.push(8 + p.weight*46);
+    color.push(CB[p.badge]);
+  });
+  return { type:"scatter3d", mode:"markers", x, y, z, text, hoverinfo:"text",
+    marker:{ size, color, line:{ width:1, color: dark?"#000":"#444" }, opacity:0.96 }, name:"assets", showlegend:false };
+}
+function surfaceTrace(field, mode){
+  const battle = mode==="battle";
+  return {
+    type:"surface", x:field.x, y:field.y, z:field.z,
+    colorscale: battle ? SNOW : JET, cmin: field.zmin, cmax: field.zmax,
+    showscale: !battle,
+    colorbar: battle ? undefined : { tickfont:{color:"#9fb0c8"}, outlinewidth:0, len:0.7, thickness:14 },
+    opacity: battle ? 1 : 0.97,
+    lighting: battle
+      ? { ambient:0.58, diffuse:0.92, specular:0.12, roughness:0.96, fresnel:0.1 }
+      : { ambient:0.7, diffuse:0.55, specular:0.18, roughness:0.55, fresnel:0.2 },
+    lightposition: battle ? { x:120, y:220, z:340 } : { x:60, y:-120, z:260 },
+    contours: battle
+      ? { z:{ show:true, usecolormap:false, color:"rgba(40,55,40,0.45)", width:1, start:field.zmin, end:field.zmax, size:(field.zmax-field.zmin)/22 } }
+      : { z:{ show:true, usecolormap:true, highlightcolor:"#ffffff", project:{z:false}, width:1 } },
+    hoverinfo:"skip",
+  };
+}
+function cloudTrace(){
+  const CB = { HIGH:"#ef4444", MODERATE:"#f0b429", LOW:"#2ec16b" };
+  const x=[],y=[],z=[],text=[],size=[],color=[];
+  CLOUD.forEach(p=>{ x.push(p.x_OFAC); y.push(p.y_SAFE); z.push(p.z_TAX);
+    const nm = NAMES[p.id] ? `${NAMES[p.id]} · ${p.label}` : p.label;
+    text.push(`<b>${nm}</b><br>OFAC ${p.x_OFAC} · SAFE ${p.y_SAFE} · CRS-tax ${p.z_TAX}`
+      + `<br>worst: ${p.dominant_axis} ${p.dominant_value} · ${p.badge}`);
+    size.push(9 + p.weight*52); color.push(CB[p.badge]); });
+  // drop a stem to the floor for depth
+  const stems = { type:"scatter3d", mode:"lines", x:[], y:[], z:[], hoverinfo:"skip",
+    line:{ color:"rgba(120,140,170,0.25)", width:2 }, showlegend:false };
+  CLOUD.forEach(p=>{ stems.x.push(p.x_OFAC,p.x_OFAC,null); stems.y.push(p.y_SAFE,p.y_SAFE,null); stems.z.push(0,p.z_TAX,null); });
+  const pts = { type:"scatter3d", mode:"markers", x,y,z,text, hoverinfo:"text",
+    marker:{ size, color, line:{width:1,color:"#04101f"}, opacity:0.95 }, showlegend:false };
+  return [stems, pts];
+}
+
+/* ================= scene / layout per mode ================= */
+function layout(mode, field, valueKey){
+  const battle = mode==="battle";
+  const cloud = mode==="cloud";
+  const dark = !battle;
+  const axisCommon = (title) => ({
+    title:{ text:title, font:{ size:11, color: battle?"#5a6470":"#8fa2bd", family:"var(--mono)" } },
+    backgroundcolor:"rgba(0,0,0,0)", gridcolor: battle?"rgba(90,100,110,0.25)":"rgba(80,110,150,0.18)",
+    zerolinecolor: battle?"rgba(90,100,110,0.4)":"rgba(80,110,150,0.3)",
+    showbackground:true, tickfont:{ size:9, color: battle?"#6a7480":"#6c7e96" }, showspikes:false,
+  });
+  const zttl = cloud ? "Z: CRS / tax transparency"
+    : ({ dominant_value:"Z: risk peak / loss", height:"Z: composite risk", x_OFAC:"Z: OFAC", y_SAFE:"Z: SAFE", z_TAX:"Z: CRS-tax" }[valueKey] || "Z: risk");
+  return {
+    paper_bgcolor: battle ? "#d7dade" : "#05070d",
+    margin:{ l:0, r:0, t:6, b:0 },
+    scene:{
+      xaxis: axisCommon("X: FSS · US sanction (OFAC)"),
+      yaxis: axisCommon("Y: CCR · CN capital lock (SAFE)"),
+      zaxis: { ...axisCommon(zttl), visible: !battle },
+      aspectratio: battle ? { x:1, y:1, z:0.32 } : { x:1, y:1, z:0.72 },
+      camera: battle
+        ? { eye:{ x:0.75, y:-1.25, z:1.35 }, center:{ x:0, y:0, z:-0.08 } }
+        : { eye:{ x:1.55, y:-1.6, z:0.85 }, center:{ x:0, y:0, z:-0.12 } },
+      bgcolor: battle ? "#d7dade" : "#05070d",
+    },
+  };
+}
+
+/* ================= render ================= */
+const state = { mode:"terrain", elev:"dominant_value", markers:true };
+const plot = document.getElementById("plot");
+
+function render(){
+  if (typeof Plotly === "undefined"){
+    plot.innerHTML = `<div class="err" style="margin:18px"><b>Plotly failed to load.</b> This view needs internet
+      for the Plotly CDN. Open over a connection, or use the v3.2 dashboard offline.</div>`;
+    return;
+  }
+  let data, lay;
+  if (state.mode === "cloud"){
+    data = cloudTrace();
+    lay = layout("cloud", null, state.elev);
+  } else {
+    const field = heightfield(state.elev);
+    data = [ surfaceTrace(field, state.mode) ];
+    if (state.markers) data.push(markerTrace(field, state.elev, state.mode!=="battle"));
+    lay = layout(state.mode, field, state.elev);
+  }
+  Plotly.react(plot, data, lay, { displayModeBar:false, responsive:true });
+  renderNote();
+}
+
+function renderNote(){
+  const note = document.getElementById("plotnote");
+  const msg = {
+    terrain: "Jet surface — warm peaks are where your capital piles risk (US-sanction edge + HK/SG tax plateau); the cyan valley is the self-custody escape zone. Drag to orbit.",
+    battle: "Battle-map relief — snow plains = safe ground, dark ridges = hostile high-risk terrain. Contour lines mark equal-risk elevation.",
+    cloud: "Point cloud (spec §6) — each holding plotted at (OFAC, SAFE, CRS-tax); marker size = weight, colour = worst-axis badge.",
+  }[state.mode];
+  note.textContent = msg;
+}
+
+/* ================= side panels ================= */
+function renderStats(){
+  const cnt = b => CLOUD.filter(p=>p.badge===b).length;
+  const frozenW = (b)=>Math.round(CLOUD.filter(p=>p.badge===b).reduce((s,p)=>s+p.weight,0)*100);
+  const html = [
+    ["🔴 "+cnt("HIGH"), "high-risk holdings ("+frozenW("HIGH")+"% wt)", "var(--red)"],
+    ["🟡 "+cnt("MODERATE"), "moderate ("+frozenW("MODERATE")+"% wt)", "var(--amber)"],
+    ["🟢 "+cnt("LOW"), "low / escape ("+frozenW("LOW")+"% wt)", "var(--green)"],
+    [centroid.x_OFAC+" / "+centroid.y_SAFE+" / "+centroid.z_TAX, "portfolio centroid · OFAC / SAFE / CRS", "var(--accent)"],
+  ].map(([n,k,c])=>`<div class="stat"><div class="n" style="color:${c}">${n}</div><div class="k">${k}</div></div>`).join("");
+  document.getElementById("stats").innerHTML = html;
+}
+function renderTable(){
+  const rows = [...CLOUD].sort((a,b)=>b.dominant_value-a.dominant_value).map(p=>{
+    const nm = NAMES[p.id] ? `${NAMES[p.id]} — ${p.label}` : p.label;
+    return `<tr><td>${p.emoji} ${nm}</td>
+      <td class="num">${p.x_OFAC}</td><td class="num">${p.y_SAFE}</td><td class="num">${p.z_TAX}</td>
+      <td class="num">${p.height}</td><td><span class="badge ${p.badge}">${p.dominant_axis} ${p.dominant_value}</span></td>
+      <td class="num">${Math.round(p.weight*100)}%</td></tr>`;
+  }).join("");
+  document.getElementById("tablewrap").innerHTML = `<table>
+    <thead><tr><th>position</th><th>X·OFAC</th><th>Y·SAFE</th><th>Z·CRS</th><th>height</th><th>worst axis</th><th>wt</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+/* ================= controls ================= */
+function wire(){
+  document.querySelectorAll(".chip.mode").forEach(el=>el.addEventListener("click",()=>{
+    document.querySelectorAll(".chip.mode").forEach(c=>c.classList.remove("on")); el.classList.add("on");
+    state.mode = el.dataset.mode; render();
+  }));
+  document.querySelectorAll(".chip.elev").forEach(el=>el.addEventListener("click",()=>{
+    document.querySelectorAll(".chip.elev").forEach(c=>c.classList.remove("on")); el.classList.add("on");
+    state.elev = el.dataset.elev; render();
+  }));
+  document.querySelectorAll(".chip.mk").forEach(el=>el.addEventListener("click",()=>{
+    state.markers = !state.markers; el.classList.toggle("on", state.markers);
+    el.textContent = state.markers ? "assets" : "hidden"; render();
+  }));
+}
+
+renderStats();
+renderTable();
+wire();
+render();
+</script>
+</body>
+</html>
