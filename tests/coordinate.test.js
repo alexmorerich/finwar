@@ -39,22 +39,22 @@ console.log("\nFINWAR v4.0 — Asset Coordinate Engine · test suite\n");
   let allIn = true;
   for (const a of SAMPLE_ASSETS) {
     const e = calculateExposure(a);
-    if (!(inUnit(e.OFAC) && inUnit(e.SAFE) && inUnit(e.CRS))) allIn = false;
+    if (!(inUnit(e.OFAC) && inUnit(e.SAFE) && inUnit(e.TAX))) allIn = false;
   }
-  check("every (OFAC,SAFE,CRS) is normalized to [0,1]", allIn);
+  check("every (OFAC,SAFE,TAX) is normalized to [0,1]", allIn);
   // an all-max synthetic asset must still clamp to ≤ 1
   const maxAsset = { settlement_system: "US_Settlement", custody_jurisdiction: "US", ownership_model: "nominee", asset_class: "ETF" };
   const m = calculateExposure(maxAsset);
-  check("a maximal asset never exceeds 1.0", inUnit(m.OFAC) && inUnit(m.SAFE) && inUnit(m.CRS), JSON.stringify(m));
+  check("a maximal asset never exceeds 1.0", inUnit(m.OFAC) && inUnit(m.SAFE) && inUnit(m.TAX), JSON.stringify(m));
 }
 
 // ── Determinism — same AssetNode ⇒ identical coordinate (no clock, no randomness) ──
 {
   const a = A.SGOV;
   check("calculateExposure is deterministic", JSON.stringify(calculateExposure(a)) === JSON.stringify(calculateExposure(a)));
-  check("toVector mirrors exposure (x=OFAC, y=SAFE, z=CRS)", (() => {
+  check("toVector mirrors exposure (x=OFAC, y=SAFE, z=TAX)", (() => {
     const e = calculateExposure(a), v = toVector(a);
-    return v.x === e.OFAC && v.y === e.SAFE && v.z === e.CRS;
+    return v.x === e.OFAC && v.y === e.SAFE && v.z === e.TAX;
   })());
 }
 
@@ -85,11 +85,11 @@ console.log("\nFINWAR v4.0 — Asset Coordinate Engine · test suite\n");
   check("BTC self-custody escapes SAFE (<0.12)", exp("BTC_COLD").SAFE < 0.12, exp("BTC_COLD").SAFE);
 }
 
-// ── CRS axis — visibility tracks the regulated book; self-custody is invisible ──
+// ── TAX axis — visibility tracks the regulated book; self-custody is invisible ──
 {
-  check("US nominee-held ETF is highly visible on CRS (>0.7)", exp("SGOV").CRS > 0.7, exp("SGOV").CRS);
-  check("BTC self-custody is invisible on CRS (<0.1)", exp("BTC_COLD").CRS < 0.1, exp("BTC_COLD").CRS);
-  check("bearer gold is low-visibility on CRS (<0.35)", exp("GOLD_DMCC").CRS < 0.35, exp("GOLD_DMCC").CRS);
+  check("US nominee-held ETF is highly visible on TAX (>0.7)", exp("SGOV").TAX > 0.7, exp("SGOV").TAX);
+  check("BTC self-custody is invisible on TAX (<0.1)", exp("BTC_COLD").TAX < 0.1, exp("BTC_COLD").TAX);
+  check("bearer gold is low-visibility on TAX (<0.35)", exp("GOLD_DMCC").TAX < 0.35, exp("GOLD_DMCC").TAX);
 }
 
 // ── Exposure weight — bubble size = vector magnitude ÷√3, a per-asset property ──
@@ -109,14 +109,14 @@ console.log("\nFINWAR v4.0 — Asset Coordinate Engine · test suite\n");
   try { e = calculateExposure({ settlement_system: "???", custody_jurisdiction: "???", ownership_model: "???", asset_class: "???" }); }
   catch { threw = true; }
   check("out-of-enum asset does not throw", !threw);
-  check("out-of-enum asset scores the 0.5 midpoint", e && e.OFAC === 0.5 && e.SAFE === 0.5 && e.CRS === 0.5, JSON.stringify(e));
+  check("out-of-enum asset scores the 0.5 midpoint", e && e.OFAC === 0.5 && e.SAFE === 0.5 && e.TAX === 0.5, JSON.stringify(e));
 }
 
 // ── assetCoordinate bundle — the per-asset object the six UI panels consume ──
 {
   const c = assetCoordinate(A.SGOV);
   check("assetCoordinate echoes the four input layers", c.settlement_system === "US_Settlement" && c.custody_jurisdiction === "US" && c.ownership_model === "nominee" && c.asset_class === "ETF");
-  check("assetCoordinate.vector matches its exposure", c.vector.x === c.exposure.OFAC && c.vector.y === c.exposure.SAFE && c.vector.z === c.exposure.CRS);
+  check("assetCoordinate.vector matches its exposure", c.vector.x === c.exposure.OFAC && c.vector.y === c.exposure.SAFE && c.vector.z === c.exposure.TAX);
   check("mapAssets returns one bundle per asset", mapAssets(SAMPLE_ASSETS).length === SAMPLE_ASSETS.length);
   // HARD RULE: no allocation / percentage weight / buy-sell field leaks into output
   const forbidden = ["allocation", "weight_pct", "percent", "recommendation", "action", "buy", "sell", "target"];

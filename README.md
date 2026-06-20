@@ -8,7 +8,7 @@ FINWAR is **not** a portfolio optimizer and **not** an advisory system. It model
 
 It ships in three layers:
 
-- **FinWar v4.0 — Asset Coordinate Engine** (`engine/coordinate/`, viewer `coordinates.html`): a deterministic 3-axis engine that maps each asset's four sovereign coordinates (Settlement × Custody × Ownership × Asset Class) to a single point in **OFAC–SAFE–CRS** space. Bilingual (English / 中文), portfolio-independent, zero-dependency. **New in v4.0** — documented in [its own section below](#finwar-v40--asset-coordinate-engine-ofacsafecrs-space).
+- **FinWar v4.0 — Asset Coordinate Engine** (`engine/coordinate/`, viewer `coordinates.html`): a deterministic 3-axis engine that maps each asset's four sovereign coordinates (Settlement × Custody × Ownership × Asset Class) to a single point in **OFAC–SAFE–TAX** space. Bilingual (English / 中文), portfolio-independent, zero-dependency. **New in v4.0** — documented in [its own section below](#finwar-v40--asset-coordinate-engine-ofacsafetax-space).
 - **FinWar v4 — `WorldState` service** (`src/`): the contract-typed Cloudflare Worker that is the **TRUTH layer feeding the [FinOS](../finos) decision pipeline**. `POST /simulate → WorldState` (events × per-bucket asset risk × binding constraints). **Start here** — see the next section.
 - **FinWar v3.2/v3.3 — survival physics engine** (`engine/`): the original zero-dependency research engine (position-chain survival + v3.3 financial kill-chain) that supplies v4's risk calibration. Documented from "Core thesis" onward.
 
@@ -88,11 +88,11 @@ The `npm test` suite includes a cross-repo acceptance test: a `/simulate` `World
 
 ---
 
-## FinWar v4.0 — Asset Coordinate Engine (OFAC–SAFE–CRS space)
+## FinWar v4.0 — Asset Coordinate Engine (OFAC–SAFE–TAX space)
 
 FinWar v4.0 adds a deterministic **3-axis asset coordinate engine** (`engine/coordinate/`, bilingual viewer `coordinates.html`). It is **not** a portfolio system, trading system, recommendation engine, or optimizer. It answers exactly one question:
 
-> **"Where is this asset located inside OFAC–SAFE–CRS space?"**
+> **"Where is this asset located inside OFAC–SAFE–TAX space?"**
 
 Every asset is **four orthogonal coordinates** (highest-priority first), each a fixed enum carrying a bilingual `English / 中文` label:
 
@@ -122,12 +122,12 @@ interface AssetNode {
 ```
 OFAC  — US sanction reach (settlement rail + custody dominate)
 SAFE  — China SAFE capital-control / outbound lock
-CRS   — Common Reporting Standard tax visibility
+TAX   — tax visibility / reporting (CRS is one node — see engine/tax/)
 ```
 
 ```typescript
-calculateExposure(asset) → { OFAC, SAFE, CRS }        // each 0–1
-toVector(asset)          → { x: OFAC, y: SAFE, z: CRS } // one point in 3D space
+calculateExposure(asset) → { OFAC, SAFE, TAX }        // each 0–1
+toVector(asset)          → { x: OFAC, y: SAFE, z: TAX } // one point in 3D space
 exposureWeight(asset)    → |(x,y,z)| ÷ √3              // magnitude — NOT an allocation
 ```
 
@@ -136,7 +136,7 @@ Each axis is `0.40·settlement + 0.30·custody + 0.20·ownership + 0.10·class` 
 The "**the listing label lies**" lesson survives the four-field collapse: encode the *true* settlement system. `O87` lists on SGX but clears DTC/CHIPS → `US_Settlement` → it lands at `x≈0.73` on the OFAC axis, while `D05` (same exchange, genuine `Singapore_Settlement`) stays at `x≈0.39`.
 
 ```
-asset             (x OFAC, y SAFE, z CRS)   weight
+asset             (x OFAC, y SAFE, z TAX)   weight
 SGOV  US T-bill    (0.895, 0.220, 0.772)    0.694   ← deep OFAC corner
 RMB   ICBC cash    (0.390, 0.845, 0.495)    0.609   ← deep SAFE trap
 BTC   self-custody (0.072, 0.082, 0.076)    0.077   ← origin corner (sovereign-free)
@@ -148,7 +148,7 @@ Self-contained (inlines the test-backed engine; runs from `file://` and GitHub P
 
 1. **Asset Coordinates / 资产坐标** — the live `(X, Y, Z)` + exposure weight
 2. **Settlement System / 结算体系** · 3. **Custody Jurisdiction / 托管司法区** · 4. **Ownership Model / 所有权模式** · 5. **Asset Class / 资产类别** — each a bilingual selector showing that layer's per-axis contribution; edit any layer and the coordinate recomputes live
-6. **3D Terrain Map / 三维风险地图** — every asset plotted at `(OFAC, SAFE, CRS)`, bubble size = exposure weight
+6. **3D Terrain Map / 三维风险地图** — every asset plotted at `(OFAC, SAFE, TAX)`, bubble size = exposure weight
 
 ### Hard rules (enforced by `tests/coordinate.test.js`)
 
@@ -249,9 +249,9 @@ finwar/
 │   │   ├── risk_engine.js          ofacDependency engine (§3) → WarPath (§4) + scenario queries + migration (§6)
 │   │   ├── portfolio.js            §7 calibration assets (full Asset schema; no weights — §8)
 │   │   └── terrain.js              CLI → WarPaths + kill-chain risk map + §4 scenario queries
-│   ├── coordinate/                 ★ v4.0 Asset Coordinate Engine (4 layers → OFAC/SAFE/CRS point)
+│   ├── coordinate/                 ★ v4.0 Asset Coordinate Engine (4 layers → OFAC/SAFE/TAX point)
 │   │   ├── layers.js               4 bilingual layer tables + per-axis calibration + priority weights
-│   │   ├── coordinate_engine.js    calculateExposure → {OFAC,SAFE,CRS} · toVector · exposureWeight (pure)
+│   │   ├── coordinate_engine.js    calculateExposure → {OFAC,SAFE,TAX} · toVector · exposureWeight (pure)
 │   │   ├── assets.js               sample AssetNodes (4-field schema; no weights/allocation)
 │   │   └── types.d.ts              Core Schema (AssetNode / Exposure / AssetVector) typed contract
 │   ├── current_holdings/           ★ Current-holdings facts catalog (8 paths · 26 holdings · raw % = 119)

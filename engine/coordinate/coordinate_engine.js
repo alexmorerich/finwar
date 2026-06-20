@@ -2,15 +2,15 @@
 //
 // Pure & deterministic: no clock, no randomness, no I/O. The same AssetNode always
 // maps to the same (x,y,z). Nothing here recommends, allocates, weights a
-// portfolio, or optimizes — it ONLY locates an asset inside OFAC–SAFE–CRS space.
+// portfolio, or optimizes — it ONLY locates an asset inside OFAC–SAFE–TAX space.
 //
 //   AssetNode { settlement_system, custody_jurisdiction, ownership_model, asset_class }
 //        │
 //        ▼  calculateExposure()   — priority-weighted fuse of the 4 layers
-//   Exposure { OFAC, SAFE, CRS }   — each normalized 0.0 … 1.0
+//   Exposure { OFAC, SAFE, TAX }   — each normalized 0.0 … 1.0
 //        │
 //        ▼  toVector()
-//   AssetVector { x:OFAC, y:SAFE, z:CRS }   — one point in 3D space
+//   AssetVector { x:OFAC, y:SAFE, z:TAX }   — one point in 3D space
 
 import {
   LAYER_PRIORITY,
@@ -44,21 +44,21 @@ function fuseAxis(L, axis) {
   return round3(clamp01(raw / 100));
 }
 
-// ─────────────────── calculateExposure(asset) → { OFAC, SAFE, CRS } (0–1) ───────────────────
+// ─────────────────── calculateExposure(asset) → { OFAC, SAFE, TAX } (0–1) ───────────────────
 export function calculateExposure(asset) {
   const L = layersOf(asset);
   return {
     OFAC: fuseAxis(L, "ofac"),
     SAFE: fuseAxis(L, "safe"),
-    CRS:  fuseAxis(L, "crs"),
+    TAX:  fuseAxis(L, "tax"),
   };
 }
 
 // ─────────────────── toVector(asset) → { x, y, z } ───────────────────
-// x = OFAC · y = SAFE · z = CRS. Every asset becomes one point in 3D space.
+// x = OFAC · y = SAFE · z = TAX. Every asset becomes one point in 3D space.
 export function toVector(asset) {
   const e = calculateExposure(asset);
-  return { x: e.OFAC, y: e.SAFE, z: e.CRS };
+  return { x: e.OFAC, y: e.SAFE, z: e.TAX };
 }
 
 // Exposure weight = the magnitude of the (x,y,z) vector, normalized to 0–1
@@ -75,7 +75,7 @@ export function exposureWeight(asset) {
 // Everything the six UI panels need for one asset, in one deterministic object.
 export function assetCoordinate(asset) {
   const exposure = calculateExposure(asset);
-  const vector = { x: exposure.OFAC, y: exposure.SAFE, z: exposure.CRS };
+  const vector = { x: exposure.OFAC, y: exposure.SAFE, z: exposure.TAX };
   return {
     id: asset.id,
     label: asset.label || asset.id,
@@ -86,7 +86,7 @@ export function assetCoordinate(asset) {
     ownership_model:      asset.ownership_model,
     asset_class:          asset.asset_class,
     // the computed outputs
-    exposure,                                  // { OFAC, SAFE, CRS } 0–1
+    exposure,                                  // { OFAC, SAFE, TAX } 0–1
     vector,                                    // { x, y, z }
     exposure_weight: exposureWeight(asset),    // 0–1 magnitude (NOT allocation)
   };

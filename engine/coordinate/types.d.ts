@@ -64,14 +64,14 @@ export interface AssetNode {
 export interface Exposure {
   OFAC: number;
   SAFE: number;
-  CRS: number;
+  TAX: number;
 }
 
 // ─────────────────── Coordinate Output — one point in 3D space ───────────────────
 export interface AssetVector {
   x: number; // OFAC
   y: number; // SAFE
-  z: number; // CRS
+  z: number; // TAX
 }
 
 // Full per-asset bundle returned by assetCoordinate() (engine extension).
