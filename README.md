@@ -12,6 +12,11 @@ It ships in three layers:
 - **FinWar v4 — `WorldState` service** (`src/`): the contract-typed Cloudflare Worker that is the **TRUTH layer feeding the [FinOS](../finos) decision pipeline**. `POST /simulate → WorldState` (events × per-bucket asset risk × binding constraints). **Start here** — see the next section.
 - **FinWar v3.2/v3.3 — survival physics engine** (`engine/`): the original zero-dependency research engine (position-chain survival + v3.3 financial kill-chain) that supplies v4's risk calibration. Documented from "Core thesis" onward.
 
+Two zero-dependency calibration modules sit alongside these layers, each with its own test suite:
+
+- **Current-holdings fixture** (`engine/current_holdings/`): the user's stated **8 sanction-risk paths / 26 holdings** as a **factual input catalog** — used to prove the engines' enums span the real book. It never enters WorldState. [Details below](#current-holdings-fixture).
+- **TAX Engine v2.0** (`engine/tax/`): upgrades the TAX axis from a single CRS score into a **7-category / 17-node** cross-jurisdiction tax-exposure engine. [Details below](#tax-engine-v20--cross-jurisdiction-tax-exposure).
+
 ---
 
 ## FinWar v4 — the `WorldState` service (FinOS truth layer)
@@ -155,6 +160,28 @@ $ node tests/coordinate.test.js   # 29 passed, 0 failed
 
 ---
 
+## Current holdings fixture
+
+`engine/current_holdings/assets.js` is a **factual calibration / input catalog** — the user's stated current positions, grouped into the **8 sanction-risk paths** they actually use (**26 holdings**), transcribed verbatim. It is **NOT** WorldState output, **NOT** an allocation or optimizer, and **NOT** investment advice. It exists so the engines can be *coverage-tested against the real book*: every holding must map cleanly onto the v4.0 coordinate engine's four layers **and** the v3.3 kill-chain engine's nodes — with no `Unknown`.
+
+**Raw percentages intentionally do not sum to 100.** `stated_pct` is copied exactly from the user's data, so the 26 holdings sum to **119**. The engine **never normalizes** them: the gap between a path's `declared_path_pct` and the sum of its holdings is itself a signal. The catalog ships a **declared-vs-stated mismatch report** — **Path 1** (declared 20 / stated 18), **Path 5** (15 / 11), **Path 6** (15 / 7) — and inventing or rescaling holdings to close those gaps is explicitly forbidden (Paths 4 / 7 / 8 match; Paths 2 / 3 declare no target).
+
+**Portfolio-independence is preserved.** Holdings, weights, and the catalog's richer bucket taxonomy NEVER enter `WorldState`, `asset_risk_matrix`, or `assetCoordinate()` output. `test/current_holdings_worldstate.test.ts` asserts no holding id or `stated_pct` ever appears in a WorldState, and the existing coordinate test's forbidden-allocation-field rule keeps passing.
+
+**Documented contract gaps.** WorldState's 8-bucket `RiskBucket` enum (`src/contracts/world_state.ts`) is intentionally not forked. Where a holding has no clean bucket, the catalog uses its own (superset) taxonomy and maps to the nearest WorldState bucket, flagging the gap:
+
+- **Issuer-risk crypto** — `USDC` / `USDT` / `XAUT` are **issuer-freezable** and must *not* be treated as censorship-resistant `BTC` / `XMR`. They settle via `Issuer_Crypto_Settlement` (OFAC ≈ 0.38 vs BTC's ≈ 0.07) and use the catalog buckets `ISSUER_STABLECOIN` / `ISSUER_GOLD_TOKEN`, never `CRYPTO_COLD`.
+- **Singapore-settled equity** (`SG_EQUITY`) — WorldState has no SG-brokerage bucket; mapped to the nearest offshore-Asian-equity bucket, with the true profile carried by the `Singapore_Settlement` coordinate + CDP/MEPS+/PayNow kill chain.
+
+Each holding carries both engine vocabularies plus its facts: `id · path_id · path_label · declared_path_pct · stated_pct · institution · account_jurisdiction · instrument/ticker · currency · settlement_system · custody_jurisdiction · ownership_model · asset_class · settlement_network · ultimate_custodian · beneficial_ownership_model · risk_bucket · notes`.
+
+```bash
+npm run validate:holdings             # 8 paths · 26 holdings · raw sum 119 · full coordinate+terrain coverage
+node tests/current_holdings.test.js   # 28 passed, 0 failed
+```
+
+---
+
 ## Core thesis
 
 Under dual-direction financial warfare, an asset's fate is **not** a property of the asset. It is a property of the **chain of intermediaries** that stands between you and the value:
@@ -222,20 +249,31 @@ finwar/
 │   │   ├── risk_engine.js          ofacDependency engine (§3) → WarPath (§4) + scenario queries + migration (§6)
 │   │   ├── portfolio.js            §7 calibration assets (full Asset schema; no weights — §8)
 │   │   └── terrain.js              CLI → WarPaths + kill-chain risk map + §4 scenario queries
-│   └── coordinate/                 ★ v4.0 Asset Coordinate Engine (4 layers → OFAC/SAFE/CRS point)
-│       ├── layers.js               4 bilingual layer tables + per-axis calibration + priority weights
-│       ├── coordinate_engine.js    calculateExposure → {OFAC,SAFE,CRS} · toVector · exposureWeight (pure)
-│       ├── assets.js               sample AssetNodes (4-field schema; no weights/allocation)
-│       └── types.d.ts              Core Schema (AssetNode / Exposure / AssetVector) typed contract
+│   ├── coordinate/                 ★ v4.0 Asset Coordinate Engine (4 layers → OFAC/SAFE/CRS point)
+│   │   ├── layers.js               4 bilingual layer tables + per-axis calibration + priority weights
+│   │   ├── coordinate_engine.js    calculateExposure → {OFAC,SAFE,CRS} · toVector · exposureWeight (pure)
+│   │   ├── assets.js               sample AssetNodes (4-field schema; no weights/allocation)
+│   │   └── types.d.ts              Core Schema (AssetNode / Exposure / AssetVector) typed contract
+│   ├── current_holdings/           ★ Current-holdings facts catalog (8 paths · 26 holdings · raw % = 119)
+│   │   ├── assets.js               the 26 stated holdings + paths + risk_bucket taxonomy + gap mapping
+│   │   ├── validate.js             validateHoldings() + CLI (counts/sum/coverage/mismatch/issuer-crypto)
+│   │   └── assets.d.ts             typed Holding / Path contract (also feeds the TS cross-check)
+│   └── tax/                        ★ TAX Engine v2.0 (7 categories · 17 nodes → taxScore)
+│       ├── tax_nodes.js            categories · 17-node registry · jurisdiction reference tables
+│       ├── tax_engine.js           computeTaxExposure · migrateLegacyTax · CLI (pure)
+│       └── types.d.ts              TaxExposure typed contract
 │
 ├── test/                           ★ v4 TS suite (node --import tsx --test)
 │   ├── worldstate.test.ts          WorldState contract + engine invariants (15 checks)
-│   └── finos_integration.test.ts   live finos decide() acceptance (skips if ../finos absent)
+│   ├── finos_integration.test.ts   live finos decide() acceptance (skips if ../finos absent)
+│   └── current_holdings_worldstate.test.ts  catalog ↛ WorldState portfolio-independence cross-check
 │
 └── tests/                          v3.2 legacy suite (zero-dep, `npm run test:legacy`)
     ├── golden.test.js              3 mandatory v3.2 golden cases (§9)
     ├── terrain.test.js             v3.3 kill-chain engine validation (43 checks)
-    └── coordinate.test.js          v4.0 coordinate engine validation (29 checks)
+    ├── coordinate.test.js          v4.0 coordinate engine validation (29 checks)
+    ├── current_holdings.test.js    current-holdings facts catalog validation (28 checks)
+    └── tax.test.js                 TAX Engine v2.0 validation (48 checks)
 ```
 
 ---
@@ -430,6 +468,35 @@ $ node tests/terrain.test.js              # 43 passed, 0 failed
 
 ---
 
+## TAX Engine v2.0 — cross-jurisdiction tax exposure
+
+A dedicated TAX engine (`engine/tax/`) upgrades the TAX axis from a single **"CRS yes/no"** number into a **7-category / 17-node** *visibility + liability + inheritance + exit + structure* engine. It models **only** TAX — it does **not** touch the Settlement, Custody, Kill-Chain, or Sanction modules; the legacy single CRS score (kill-chain `taxTransparencyExposure`) is left intact and is now just *one node* (`informationExchange.CRS`).
+
+`computeTaxExposure(asset, context?)` returns the seven categories — each `{ score 0–100, level NONE|LOW|MEDIUM|HIGH, reasons[] }` — fused with the spec §9 weights into `{ taxScore, taxLevel, breakdown }`:
+
+| # | Category (axis) | Weight | Nodes | Answers |
+| --- | --- | --- | --- | --- |
+| 1 | **informationExchange** / 信息交换 | 0.25 | CRS · FATCA · EOIR · AMLVisibility | Will it be **reported**? |
+| 2 | **incomeTax** / 所得税 | 0.15 | dividend · interest · capgains · rental | Taxed on **income**? |
+| 3 | **exitTax** / 退出税 | 0.10 | real-estate exit · equity transfer | Taxed when **sold**? |
+| 4 | **estateGiftTax** / 遗产·赠与 | 0.20 | US estate · US gift · UK IHT · JP IHT · CN potential | Taxed when **inherited**? |
+| 5 | **cfcRisk** / 受控外国公司 | 0.10 | CN · US · OECD CFC | Triggers **CFC**? |
+| 6 | **antiAvoidance** / 反避税 | 0.10 | GAAR · BEPS2 · ESR · BO-test | Is it **avoidance**? |
+| 7 | **specialAssetTax** / 特殊资产税 | 0.10 | gold · crypto · RE-holding · fund-structure | **Special** treatment? |
+
+The 17 nodes keep each distinct legal regime expanded (the four info-exchange flags, the five estate jurisdictions, the three CFC regimes) while collapsing the multi-rate categories (income, exit, anti-avoidance) to one node each and splitting special-asset into physical / financial: `4 + 1 + 1 + 5 + 3 + 1 + 2 = 17`.
+
+**Calibration over the current holdings.** A US-domiciled ETF held via a HK bank tops the axis — `informationExchange` 100 (CRS + FATCA + EOIR + AML) and `estateGiftTax` 90 (US-situs estate tax > $60k) — while self-custody BTC sits near zero (no reporting nexus). CN mainland gold scores `specialAssetTax` HIGH (export-locked), HK equities carry MEDIUM `exitTax` (stamp duty), and issuer stablecoins are more reportable than BTC.
+
+**Migration is non-breaking (spec §10).** `migrateLegacyTax(legacyCrs)` maps a known CRS flag to `informationExchange.CRS` and defaults every other field to `0` / `false`, returning the full `TaxExposure` shape — so legacy single-score data upgrades with no breakage.
+
+```bash
+npm run tax                 # tax breakdown table over the 26 current holdings
+node tests/tax.test.js      # 48 passed, 0 failed
+```
+
+---
+
 ## Run it
 
 ```bash
@@ -440,9 +507,13 @@ npm test            # v4 WorldState suite + live finos decide() acceptance
 npm run dev         # wrangler dev → POST /simulate · GET /state · GET /health
 
 # ── FinWar v3.2 — legacy survival engine (zero-dependency) ──
-npm run test:legacy # golden.test.js && terrain.test.js && coordinate.test.js
+npm run test:legacy # golden + terrain + coordinate + current_holdings + tax suites
 npm run sim                                   # CLI simulation (default: dual)
 node engine/engine.js US_SANCTION CN_CAPITAL_LOCK GLOBAL_COLLAPSE
+
+# Current-holdings facts catalog + TAX Engine v2.0 (zero-dependency)
+npm run validate:holdings                     # validate the 8-path / 26-holding catalog
+npm run tax                                   # tax exposure breakdown over the current holdings
 
 # v4.0 Asset Coordinate Engine
 node tests/coordinate.test.js                 # coordinate engine validation (29 checks)

@@ -10,7 +10,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "test:legacy": "node tests/golden.test.js && node tests/terrain.test.js && node tests/coordinate.test.js",
+    "test:legacy": "node tests/golden.test.js && node tests/terrain.test.js && node tests/coordinate.test.js && node tests/current_holdings.test.js && node tests/tax.test.js",
+    "validate:holdings": "node engine/current_holdings/validate.js",
+    "tax": "node engine/tax/tax_engine.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "sim": "node engine/engine.js",
