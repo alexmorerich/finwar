@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FINWAR v4.0 — Asset Coordinate Engine / 资产坐标引擎</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    --bg: #05070d; --panel: #101622; --panel2: #18202e; --line: #232c3b;
+    --txt: #d7e0ee; --mut: #7c8aa0; --accent: #4da3ff;
+    --green: #2ec16b; --amber: #f0b429; --red: #ef4444; --blue: #4da3ff;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.45; }
+  header { padding: 16px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-family: var(--mono); letter-spacing: .5px; color: var(--accent); }
+  header .tag { color: var(--mut); font-size: 12px; }
+  header a { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .wrap { padding: 16px 22px; max-width: 1320px; margin: 0 auto; }
+  .controls { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .grp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lbl { color: var(--mut); font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; margin-right: 2px; }
+  .chip { cursor: pointer; user-select: none; border: 1px solid var(--line); background: var(--panel2); color: var(--txt);
+    padding: 7px 12px; border-radius: 8px; font-size: 12.5px; transition: .12s; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  .chip .zh { color: var(--mut); font-size: 11px; margin-left: 3px; }
+  .chip.on .zh { color: #0a2a47; }
+
+  /* six-panel grid */
+  .panels { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); margin: 4px 0 14px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; }
+  .panel .pt { color: var(--mut); font-size: 11px; letter-spacing: .4px; margin-bottom: 9px; display: flex; align-items: baseline; gap: 6px; }
+  .panel .pt b { color: var(--txt); font-weight: 600; font-size: 11.5px; }
+  .panel .pt .zh { color: var(--mut); font-weight: 400; }
+  .panel.coords { grid-column: span 4; background: linear-gradient(180deg, #121a2a, #0d1320); }
+
+  /* panel 1 — the big coordinate readout */
+  .coordrow { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-end; }
+  .axis { display: flex; flex-direction: column; gap: 2px; }
+  .axis .ak { color: var(--mut); font-size: 11px; }
+  .axis .av { font-family: var(--mono); font-size: 30px; font-weight: 700; line-height: 1; }
+  .axis .bar { height: 5px; border-radius: 3px; background: var(--panel2); margin-top: 6px; width: 150px; overflow: hidden; }
+  .axis .bar > span { display: block; height: 100%; }
+  .coordsep { width: 1px; align-self: stretch; background: var(--line); }
+  .vecpill { font-family: var(--mono); font-size: 12.5px; color: var(--mut); margin-top: 4px; }
+  .wpill { margin-left: auto; text-align: right; }
+  .wpill .av { font-size: 22px; }
+
+  /* layer panels (2–5): a bilingual <select> + the chosen value's axis scores */
+  select { width: 100%; background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 9px; font-size: 12.5px; font-family: inherit; cursor: pointer; }
+  select:focus { outline: none; border-color: var(--accent); }
+  .mini { display: flex; gap: 10px; margin-top: 10px; }
+  .mini .m { flex: 1; }
+  .mini .mk { color: var(--mut); font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; }
+  .mini .mv { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .mini .mbar { height: 4px; border-radius: 2px; background: var(--panel2); margin-top: 3px; overflow: hidden; }
+  .mini .mbar > span { display: block; height: 100%; }
+  .prio { color: var(--mut); font-size: 10px; margin-top: 9px; font-family: var(--mono); }
+
+  #plot { width: 100%; height: 66vh; min-height: 500px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+  .plotnote { color: var(--mut); font-size: 11.5px; margin: 8px 2px 18px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--mut); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: .6px; }
+  th .zh, td .zh { color: var(--mut); font-weight: 400; }
+  td.num { font-family: var(--mono); text-align: right; }
+  tr.sel td { background: #14202f; }
+  tr.assetrow { cursor: pointer; }
+  tr.assetrow:hover td { background: #131c29; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+  footer { color: var(--mut); font-size: 11.5px; padding: 22px; text-align: center; border-top: 1px solid var(--line); margin-top: 22px; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-family: var(--mono); }
+  .err { background: #2a1414; border: 1px solid #5a2a2a; color: #ffc0c0; padding: 16px; border-radius: 10px; font-size: 13px; }
+  @media (max-width: 900px) { .panels { grid-template-columns: repeat(2, 1fr); } .panel.coords { grid-column: span 2; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>◎ FINWAR · ASSET COORDINATE ENGINE / 资产坐标引擎</h1>
+  <span class="tag">v4.0 · Settlement × Custody × Ownership × Asset Class → (OFAC, SAFE, CRS) · 四层资产坐标</span>
+  <a href="./terrain.html">← v3.3 kill-chain</a>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="grp"><span class="lbl">Load asset / 载入资产</span><span id="picker"></span></div>
+    <div class="grp"><span class="lbl">Color axis / 着色轴</span>
+      <span class="chip ax on" data-ax="worst">Worst / 最高</span>
+      <span class="chip ax" data-ax="OFAC">OFAC</span>
+      <span class="chip ax" data-ax="SAFE">SAFE</span>
+      <span class="chip ax" data-ax="CRS">CRS</span>
+    </div>
+  </div>
+
+  <!-- ░░ SIX PANELS ░░ -->
+  <div class="panels">
+    <!-- Panel 1 · Asset Coordinates / 资产坐标 -->
+    <div class="panel coords">
+      <div class="pt">① <b>Asset Coordinates</b><span class="zh">/ 资产坐标</span> · <span id="coordName" class="zh"></span></div>
+      <div class="coordrow" id="coordRow"></div>
+    </div>
+
+    <!-- Panels 2–5 · the four layers (each a bilingual selector + axis scores) -->
+    <div class="panel" data-layer="settlement_system">
+      <div class="pt">② <b>Settlement System</b><span class="zh">/ 结算体系</span></div>
+      <select id="sel_settlement_system"></select>
+      <div class="mini" id="mini_settlement_system"></div>
+      <div class="prio">priority / 权重 0.40 · highest 最高</div>
+    </div>
+    <div class="panel" data-layer="custody_jurisdiction">
+      <div class="pt">③ <b>Custody Jurisdiction</b><span class="zh">/ 托管司法区</span></div>
+      <select id="sel_custody_jurisdiction"></select>
+      <div class="mini" id="mini_custody_jurisdiction"></div>
+      <div class="prio">priority / 权重 0.30</div>
+    </div>
+    <div class="panel" data-layer="ownership_model">
+      <div class="pt">④ <b>Ownership Model</b><span class="zh">/ 所有权模式</span></div>
+      <select id="sel_ownership_model"></select>
+      <div class="mini" id="mini_ownership_model"></div>
+      <div class="prio">priority / 权重 0.20 · confiscation resistance 抗没收</div>
+    </div>
+    <div class="panel" data-layer="asset_class">
+      <div class="pt">⑤ <b>Asset Class</b><span class="zh">/ 资产类别</span></div>
+      <select id="sel_asset_class"></select>
+      <div class="mini" id="mini_asset_class"></div>
+      <div class="prio">priority / 权重 0.10 · lowest 最低</div>
+    </div>
+  </div>
+
+  <!-- Panel 6 · 3D Terrain Map / 三维风险地图 -->
+  <div class="panel" style="padding:13px 15px 6px;">
+    <div class="pt">⑥ <b>3D Terrain Map</b><span class="zh">/ 三维风险地图</span> · X=OFAC · Y=SAFE · Z=CRS · bubble = exposure weight / 气泡=风险权重</div>
+  </div>
+  <div id="plot"></div>
+  <div class="plotnote" id="plotnote"></div>
+
+  <div id="tablewrap"></div>
+
+  <footer>
+    Deterministic asset <b>coordinate</b> engine / 确定性资产坐标引擎 — it locates an asset inside OFAC–SAFE–CRS space and nothing more.
+    <b>No</b> allocation, percentage weight, buy/sell, strategy, or optimization / 不含配置、权重、买卖、策略或优化.
+    Heuristic model — not investment, legal, or tax advice. Engine &amp; tests: <code>engine/coordinate/</code> + <code>tests/coordinate.test.js</code>.
+  </footer>
+</div>
+
+<script>
+/* ======================================================================
+   FINWAR v4.0 Asset Coordinate Engine — self-contained. Inlines
+   engine/coordinate/{layers,coordinate_engine,assets}.js (test-backed by
+   tests/coordinate.test.js) so the page runs from file://.
+   ====================================================================== */
+
+// ---- engine/coordinate/layers.js ----
+const AXES = { OFAC:{en:"OFAC Exposure",zh:"OFAC风险"}, SAFE:{en:"SAFE Exposure",zh:"SAFE风险"}, CRS:{en:"CRS Exposure",zh:"CRS风险"} };
+const LAYER_PRIORITY = { settlement_system:0.40, custody_jurisdiction:0.30, ownership_model:0.20, asset_class:0.10 };
+const SETTLEMENT_SYSTEMS = {
+  US_Settlement:            { en:"US Settlement",            zh:"美国结算体系",   ofac:95, safe: 5, crs:70 },
+  Singapore_Settlement:     { en:"Singapore Settlement",     zh:"新加坡结算体系", ofac:30, safe:20, crs:75 },
+  HongKong_Settlement:      { en:"Hong Kong Settlement",     zh:"香港结算体系",   ofac:45, safe:50, crs:65 },
+  China_Settlement:         { en:"China Settlement",         zh:"中国结算体系",   ofac:25, safe:95, crs:40 },
+  Decentralized_Settlement: { en:"Decentralized Settlement", zh:"去中心化结算",   ofac: 8, safe: 8, crs: 8 },
+  Issuer_Crypto_Settlement: { en:"Issuer Crypto Settlement", zh:"发行方加密结算", ofac:70, safe:30, crs:30 },
+  Physical_Gold_Settlement: { en:"Physical Gold Settlement", zh:"实物黄金结算",   ofac: 5, safe:10, crs:20 },
+  Real_Estate_Settlement:   { en:"Real Estate Settlement",   zh:"房地产结算",     ofac:15, safe:60, crs:50 },
+};
+const CUSTODY_JURISDICTIONS = {
+  US:            { en:"United States", zh:"美国",     ofac:90, safe: 5, crs:80 },
+  Singapore:     { en:"Singapore",     zh:"新加坡",   ofac:35, safe:20, crs:75 },
+  HongKong:      { en:"Hong Kong",     zh:"香港",     ofac:40, safe:55, crs:65 },
+  ChinaMainland: { en:"China Mainland", zh:"中国大陆", ofac:25, safe:95, crs:35 },
+  DMCC:          { en:"Dubai DMCC",    zh:"迪拜DMCC", ofac:30, safe:15, crs:45 },
+  None:          { en:"No Custody",    zh:"无托管",   ofac: 5, safe: 5, crs: 8 },
+};
+const OWNERSHIP_MODELS = {
+  custodian:           { en:"Custodian",           zh:"托管模式",   ofac:80, safe:60, crs:85 },
+  nominee:             { en:"Nominee",             zh:"名义持有",   ofac:90, safe:65, crs:90 },
+  self_custody:        { en:"Self Custody",        zh:"自主保管",   ofac: 5, safe:10, crs: 5 },
+  physical_possession: { en:"Physical Possession", zh:"实物持有",   ofac:10, safe:20, crs:12 },
+  bearer:              { en:"Bearer Asset",        zh:"不记名资产", ofac:12, safe:15, crs: 8 },
+  direct_register:     { en:"Direct Registration", zh:"直接登记",   ofac:50, safe:55, crs:70 },
+};
+const ASSET_CLASSES = {
+  Equity:       { en:"Equity",         zh:"股票",     ofac:60, safe:55, crs:70 },
+  ETF:          { en:"ETF",            zh:"ETF",      ofac:65, safe:55, crs:72 },
+  FixedIncome:  { en:"Fixed Income",   zh:"固定收益", ofac:65, safe:50, crs:70 },
+  Cash:         { en:"Cash",           zh:"现金",     ofac:55, safe:60, crs:60 },
+  PhysicalGold: { en:"Physical Gold",  zh:"实物黄金", ofac:10, safe:15, crs:30 },
+  RealEstate:   { en:"Real Estate",    zh:"房地产",   ofac:20, safe:70, crs:50 },
+  Crypto:       { en:"Cryptocurrency", zh:"加密货币", ofac:15, safe:15, crs:10 },
+  Stablecoin:   { en:"Stablecoin",     zh:"稳定币",   ofac:70, safe:35, crs:25 },
+  PrivateAsset: { en:"Private Asset",  zh:"私募资产", ofac:45, safe:55, crs:40 },
+};
+const TABLE = { settlement_system:SETTLEMENT_SYSTEMS, custody_jurisdiction:CUSTODY_JURISDICTIONS, ownership_model:OWNERSHIP_MODELS, asset_class:ASSET_CLASSES };
+const FALLBACK = { en:"Unknown", zh:"未知", ofac:50, safe:50, crs:50 };
+const rec = (layer, k) => TABLE[layer][k] || FALLBACK;
+const bi = (r) => r ? `${r.en} / ${r.zh}` : "—";
+
+// ---- engine/coordinate/coordinate_engine.js ----
+const round3 = x => Math.round(x*1000)/1000;
+const clamp01 = x => Math.max(0, Math.min(1, x));
+function fuseAxis(asset, axis) {
+  const raw =
+    LAYER_PRIORITY.settlement_system    * rec("settlement_system",    asset.settlement_system)[axis] +
+    LAYER_PRIORITY.custody_jurisdiction * rec("custody_jurisdiction", asset.custody_jurisdiction)[axis] +
+    LAYER_PRIORITY.ownership_model      * rec("ownership_model",      asset.ownership_model)[axis] +
+    LAYER_PRIORITY.asset_class          * rec("asset_class",          asset.asset_class)[axis];
+  return round3(clamp01(raw / 100));
+}
+const calculateExposure = a => ({ OFAC:fuseAxis(a,"ofac"), SAFE:fuseAxis(a,"safe"), CRS:fuseAxis(a,"crs") });
+const toVector = a => { const e = calculateExposure(a); return { x:e.OFAC, y:e.SAFE, z:e.CRS }; };
+const SQRT3 = Math.sqrt(3);
+const exposureWeight = a => { const v = toVector(a); return round3(Math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z)/SQRT3); };
+
+// ---- engine/coordinate/assets.js (sample AssetNodes) ----
+const SAMPLE_ASSETS = [
+  { id:"SGOV",       label:"iShares 0-3M Treasury ETF (SGOV)", settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"nominee",         asset_class:"ETF" },
+  { id:"O87",        label:"SPDR Gold Shares (SGX O87)",        settlement_system:"US_Settlement",            custody_jurisdiction:"Singapore",     ownership_model:"nominee",         asset_class:"ETF" },
+  { id:"D05",        label:"DBS Group Holdings (SGX D05)",      settlement_system:"Singapore_Settlement",     custody_jurisdiction:"Singapore",     ownership_model:"direct_register", asset_class:"Equity" },
+  { id:"UST10Y",     label:"US Treasury 10Y note (direct)",     settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"custodian",       asset_class:"FixedIncome" },
+  { id:"2800",       label:"Tracker Fund of Hong Kong (2800)",  settlement_system:"HongKong_Settlement",      custody_jurisdiction:"HongKong",      ownership_model:"custodian",       asset_class:"ETF" },
+  { id:"USDC_SG",    label:"USDC at a Singapore exchange",      settlement_system:"Issuer_Crypto_Settlement", custody_jurisdiction:"Singapore",     ownership_model:"custodian",       asset_class:"Stablecoin" },
+  { id:"PE_FUND_SG", label:"Singapore private-equity fund",     settlement_system:"Singapore_Settlement",     custody_jurisdiction:"Singapore",     ownership_model:"nominee",         asset_class:"PrivateAsset" },
+  { id:"RMB_ICBC",   label:"RMB demand deposit at ICBC",        settlement_system:"China_Settlement",         custody_jurisdiction:"ChinaMainland", ownership_model:"custodian",       asset_class:"Cash" },
+  { id:"SZ_PROPERTY",label:"Shenzhen residential real estate",  settlement_system:"Real_Estate_Settlement",   custody_jurisdiction:"ChinaMainland", ownership_model:"direct_register", asset_class:"RealEstate" },
+  { id:"GOLD_DMCC",  label:"Physical gold bar (DMCC vault)",    settlement_system:"Physical_Gold_Settlement", custody_jurisdiction:"DMCC",          ownership_model:"bearer",          asset_class:"PhysicalGold" },
+  { id:"BTC_COLD",   label:"BTC — cold wallet (self-custody)",  settlement_system:"Decentralized_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",    asset_class:"Crypto" },
+];
+
+/* ================= view ================= */
+const COL = { hi:"#ef4444", mid:"#f0b429", lo:"#2ec16b" };
+const band = v => v > 0.65 ? "hi" : v >= 0.35 ? "mid" : "lo";       // 0–1
+const bandColor = v => COL[band(v)];
+const axisColor = (e, ax) => ax === "worst" ? bandColor(Math.max(e.OFAC, e.SAFE, e.CRS)) : bandColor(e[ax]);
+const pct = v => Math.round(v * 100);
+
+// live AssetNode the panels operate on (seeded from the first sample)
+const state = { asset: { ...SAMPLE_ASSETS[0] }, ax: "worst" };
+
+function buildPicker() {
+  document.getElementById("picker").innerHTML = SAMPLE_ASSETS
+    .map(a => `<span class="chip pk" data-id="${a.id}">${a.id}</span>`).join("");
+  document.querySelectorAll(".chip.pk").forEach(el => el.addEventListener("click", () => {
+    const a = SAMPLE_ASSETS.find(s => s.id === el.dataset.id);
+    state.asset = { ...a };
+    syncSelectsFromState();
+    renderAll();
+  }));
+}
+function buildSelects() {
+  for (const layer of Object.keys(TABLE)) {
+    const sel = document.getElementById("sel_" + layer);
+    sel.innerHTML = Object.entries(TABLE[layer])
+      .map(([k, r]) => `<option value="${k}">${bi(r)}</option>`).join("");
+    sel.addEventListener("change", () => { state.asset[layer] = sel.value; state.asset.label = state.asset.label || sel.value; renderAll(); });
+  }
+}
+function syncSelectsFromState() {
+  for (const layer of Object.keys(TABLE)) document.getElementById("sel_" + layer).value = state.asset[layer];
+}
+
+/* ---- Panel 1 · Asset Coordinates ---- */
+function renderCoords() {
+  const e = calculateExposure(state.asset), w = exposureWeight(state.asset);
+  document.getElementById("coordName").textContent = state.asset.label || state.asset.id;
+  const axCard = (k) => {
+    const v = e[k], c = bandColor(v);
+    return `<div class="axis">
+      <div class="ak"><b style="color:${c}">${k}</b> · ${AXES[k].zh}</div>
+      <div class="av" style="color:${c}">${v.toFixed(3)}</div>
+      <div class="bar"><span style="width:${pct(v)}%;background:${c}"></span></div></div>`;
+  };
+  document.getElementById("coordRow").innerHTML =
+    axCard("OFAC") + `<div class="coordsep"></div>` + axCard("SAFE") + `<div class="coordsep"></div>` + axCard("CRS")
+    + `<div class="axis wpill">
+        <div class="ak">exposure weight / 风险权重</div>
+        <div class="av" style="color:${bandColor(w)}">${w.toFixed(3)}</div>
+        <div class="vecpill">(x, y, z) = (${e.OFAC.toFixed(2)}, ${e.SAFE.toFixed(2)}, ${e.CRS.toFixed(2)})</div></div>`;
+}
+
+/* ---- Panels 2–5 · each layer's (OFAC,SAFE,CRS) contribution ---- */
+function renderLayerMini(layer) {
+  const r = rec(layer, state.asset[layer]);
+  const cell = (k, score) => {
+    const c = bandColor(score / 100);
+    return `<div class="m"><div class="mk">${k}</div><div class="mv" style="color:${c}">${score}</div>
+      <div class="mbar"><span style="width:${score}%;background:${c}"></span></div></div>`;
+  };
+  document.getElementById("mini_" + layer).innerHTML = cell("OFAC", r.ofac) + cell("SAFE", r.safe) + cell("CRS", r.crs);
+}
+
+/* ---- Panel 6 · 3D terrain map (all assets; selected one ringed) ---- */
+function cloudTraces() {
+  const x=[], y=[], z=[], text=[], color=[], size=[], line=[];
+  for (const a of SAMPLE_ASSETS) {
+    const e = calculateExposure(a), w = exposureWeight(a);
+    x.push(e.OFAC); y.push(e.SAFE); z.push(e.CRS);
+    size.push(10 + w * 34);
+    color.push(axisColor(e, state.ax));
+    line.push(a.id === state.asset.id ? "#ffffff" : "#04101f");
+    text.push(`<b>${a.label}</b><br>(x,y,z) = (${e.OFAC.toFixed(2)}, ${e.SAFE.toFixed(2)}, ${e.CRS.toFixed(2)})`
+      + `<br>OFAC ${e.OFAC.toFixed(3)} · SAFE ${e.SAFE.toFixed(3)} · CRS ${e.CRS.toFixed(3)} · weight ${w.toFixed(3)}`
+      + `<br>${bi(rec("settlement_system",a.settlement_system))} · ${bi(rec("custody_jurisdiction",a.custody_jurisdiction))}`
+      + `<br>${bi(rec("ownership_model",a.ownership_model))} · ${bi(rec("asset_class",a.asset_class))}`);
+  }
+  // vertical stems to the OFAC–SAFE floor (z=0) for depth reading
+  const stems = { type:"scatter3d", mode:"lines", x:[], y:[], z:[], hoverinfo:"skip", showlegend:false, line:{ color:"rgba(120,140,170,0.22)", width:2 } };
+  for (const a of SAMPLE_ASSETS) { const e = calculateExposure(a); stems.x.push(e.OFAC,e.OFAC,null); stems.y.push(e.SAFE,e.SAFE,null); stems.z.push(0,e.CRS,null); }
+  const pts = { type:"scatter3d", mode:"markers", x, y, z, text, hoverinfo:"text",
+    marker:{ size, color, line:{ width:2, color:line }, opacity:0.95 }, showlegend:false };
+  return [stems, pts];
+}
+function cloudLayout() {
+  const axis = (t) => ({ title:{ text:t, font:{ size:11, color:"#8fa2bd", family:"var(--mono)" } }, range:[0,1],
+    backgroundcolor:"rgba(0,0,0,0)", gridcolor:"rgba(80,110,150,0.18)", zerolinecolor:"rgba(80,110,150,0.3)", showbackground:true, tickfont:{ size:9, color:"#6c7e96" } });
+  return { paper_bgcolor:"#05070d", margin:{ l:0, r:0, t:6, b:0 },
+    scene:{ xaxis:axis("X · OFAC风险"), yaxis:axis("Y · SAFE风险"), zaxis:axis("Z · CRS风险"),
+      aspectratio:{ x:1, y:1, z:1 }, camera:{ eye:{ x:1.55, y:-1.6, z:0.95 }, center:{ x:0, y:0, z:-0.08 } }, bgcolor:"#05070d" } };
+}
+const plot = document.getElementById("plot");
+function renderPlot() {
+  if (typeof Plotly === "undefined") {
+    plot.innerHTML = `<div class="err" style="margin:18px"><b>Plotly failed to load / Plotly 加载失败.</b>
+      This 3D map needs the Plotly CDN — open over an internet connection. The six panels above work offline.</div>`;
+    return;
+  }
+  Plotly.react(plot, cloudTraces(), cloudLayout(), { displayModeBar:false, responsive:true });
+  document.getElementById("plotnote").innerHTML =
+    "Each asset is one point at (OFAC, SAFE, CRS); bubble size = exposure weight (distance from the safe origin). "
+    + "Self-custody / physical sit near the origin; US-settled positions spike X(OFAC); onshore-China assets spike Y(SAFE). "
+    + "<span class='zh'>每个资产是 (OFAC, SAFE, CRS) 空间中的一个点；气泡大小=风险权重。自主保管/实物资产靠近原点；美国结算资产在 X(OFAC) 轴突出；中国境内资产在 Y(SAFE) 轴突出。</span>";
+}
+
+/* ---- table of all assets ---- */
+function renderTable() {
+  const rows = SAMPLE_ASSETS.map(a => {
+    const e = calculateExposure(a), w = exposureWeight(a);
+    const c = axisColor(e, state.ax);
+    return `<tr class="assetrow ${a.id === state.asset.id ? "sel" : ""}" data-id="${a.id}">
+      <td><span class="dot" style="background:${c}"></span>${a.label}</td>
+      <td class="num">${e.OFAC.toFixed(3)}</td><td class="num">${e.SAFE.toFixed(3)}</td><td class="num">${e.CRS.toFixed(3)}</td>
+      <td class="num">${w.toFixed(3)}</td>
+      <td class="zh" style="font-size:11px">${rec("settlement_system",a.settlement_system).zh} · ${rec("custody_jurisdiction",a.custody_jurisdiction).zh}</td></tr>`;
+  }).join("");
+  document.getElementById("tablewrap").innerHTML = `<table>
+    <thead><tr><th>Asset <span class="zh">资产</span></th><th>X · OFAC</th><th>Y · SAFE</th><th>Z · CRS</th>
+      <th>Weight <span class="zh">权重</span></th><th>Settlement · Custody <span class="zh">结算·托管</span></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+  document.querySelectorAll("tr.assetrow").forEach(el => el.addEventListener("click", () => {
+    state.asset = { ...SAMPLE_ASSETS.find(s => s.id === el.dataset.id) };
+    syncSelectsFromState(); renderAll();
+  }));
+}
+
+function renderAll() {
+  renderCoords();
+  for (const layer of Object.keys(TABLE)) renderLayerMini(layer);
+  renderPlot();
+  renderTable();
+}
+
+/* ---- controls ---- */
+document.querySelectorAll(".chip.ax").forEach(el => el.addEventListener("click", () => {
+  document.querySelectorAll(".chip.ax").forEach(c => c.classList.remove("on"));
+  el.classList.add("on"); state.ax = el.dataset.ax; renderPlot(); renderTable();
+}));
+
+buildPicker();
+buildSelects();
+syncSelectsFromState();
+renderAll();
+</script>
+</body>
+</html>

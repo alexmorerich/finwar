@@ -4,10 +4,11 @@
 
 FINWAR is **not** a portfolio optimizer and **not** an advisory system. It models the **world**; it never sees a portfolio and never recommends an action.
 
-**▶ Live demo** (GitHub Pages — no install): **[Financial Kill-Chain v3.3](https://alexmorerich.github.io/finwar/terrain.html)** · [v3.2 survival dashboard](https://alexmorerich.github.io/finwar/) · [self-contained demo](https://alexmorerich.github.io/finwar/demo.html)
+**▶ Live demo** (GitHub Pages — no install): **[v4.0 Asset Coordinate Engine](https://alexmorerich.github.io/finwar/coordinates.html)** (bilingual) · [Financial Kill-Chain v3.3](https://alexmorerich.github.io/finwar/terrain.html) · [v3.2 survival dashboard](https://alexmorerich.github.io/finwar/) · [self-contained demo](https://alexmorerich.github.io/finwar/demo.html)
 
-It ships in two layers:
+It ships in three layers:
 
+- **FinWar v4.0 — Asset Coordinate Engine** (`engine/coordinate/`, viewer `coordinates.html`): a deterministic 3-axis engine that maps each asset's four sovereign coordinates (Settlement × Custody × Ownership × Asset Class) to a single point in **OFAC–SAFE–CRS** space. Bilingual (English / 中文), portfolio-independent, zero-dependency. **New in v4.0** — documented in [its own section below](#finwar-v40--asset-coordinate-engine-ofacsafecrs-space).
 - **FinWar v4 — `WorldState` service** (`src/`): the contract-typed Cloudflare Worker that is the **TRUTH layer feeding the [FinOS](../finos) decision pipeline**. `POST /simulate → WorldState` (events × per-bucket asset risk × binding constraints). **Start here** — see the next section.
 - **FinWar v3.2/v3.3 — survival physics engine** (`engine/`): the original zero-dependency research engine (position-chain survival + v3.3 financial kill-chain) that supplies v4's risk calibration. Documented from "Core thesis" onward.
 
@@ -82,6 +83,78 @@ The `npm test` suite includes a cross-repo acceptance test: a `/simulate` `World
 
 ---
 
+## FinWar v4.0 — Asset Coordinate Engine (OFAC–SAFE–CRS space)
+
+FinWar v4.0 adds a deterministic **3-axis asset coordinate engine** (`engine/coordinate/`, bilingual viewer `coordinates.html`). It is **not** a portfolio system, trading system, recommendation engine, or optimizer. It answers exactly one question:
+
+> **"Where is this asset located inside OFAC–SAFE–CRS space?"**
+
+Every asset is **four orthogonal coordinates** (highest-priority first), each a fixed enum carrying a bilingual `English / 中文` label:
+
+| Layer | Field | Priority | Enum (count) |
+| --- | --- | --- | --- |
+| **1 · Settlement System** / 结算体系 | `settlement_system` | 0.40 (highest) | US · Singapore · HongKong · China · Decentralized · Issuer-Crypto · Physical-Gold · Real-Estate (8) |
+| **2 · Custody Jurisdiction** / 托管司法区 | `custody_jurisdiction` | 0.30 | US · Singapore · HongKong · ChinaMainland · DMCC · None (6) |
+| **3 · Ownership Model** / 所有权模式 | `ownership_model` | 0.20 | custodian · nominee · self_custody · physical_possession · bearer · direct_register (6) |
+| **4 · Asset Class** / 资产类别 | `asset_class` | 0.10 (lowest) | Equity · ETF · FixedIncome · Cash · PhysicalGold · RealEstate · Crypto · Stablecoin · PrivateAsset (9) |
+
+`AssetNode` is exactly those four fields + an `id` (the full typed contract is [`engine/coordinate/types.d.ts`](engine/coordinate/types.d.ts)):
+
+```typescript
+interface AssetNode {
+  id: string;
+  settlement_system: SettlementSystem;       // LAYER 1 — highest priority
+  custody_jurisdiction: CustodyJurisdiction;  // LAYER 2
+  ownership_model: OwnershipModel;            // LAYER 3 — confiscation resistance
+  asset_class: AssetClass;                    // LAYER 4 — lowest priority
+}
+```
+
+### Exposure engine → coordinate
+
+`calculateExposure(asset)` fuses the four layers with the priority weights above into three sovereign axes, each **normalized 0.0 – 1.0**:
+
+```
+OFAC  — US sanction reach (settlement rail + custody dominate)
+SAFE  — China SAFE capital-control / outbound lock
+CRS   — Common Reporting Standard tax visibility
+```
+
+```typescript
+calculateExposure(asset) → { OFAC, SAFE, CRS }        // each 0–1
+toVector(asset)          → { x: OFAC, y: SAFE, z: CRS } // one point in 3D space
+exposureWeight(asset)    → |(x,y,z)| ÷ √3              // magnitude — NOT an allocation
+```
+
+Each axis is `0.40·settlement + 0.30·custody + 0.20·ownership + 0.10·class` over that value's 0–100 calibration score (lineage: the v3.3 kill-chain nodes), divided by 100 and clamped to [0,1]. Pure and **clock-free** — the same `AssetNode` always maps to the same `(x,y,z)`.
+
+The "**the listing label lies**" lesson survives the four-field collapse: encode the *true* settlement system. `O87` lists on SGX but clears DTC/CHIPS → `US_Settlement` → it lands at `x≈0.73` on the OFAC axis, while `D05` (same exchange, genuine `Singapore_Settlement`) stays at `x≈0.39`.
+
+```
+asset             (x OFAC, y SAFE, z CRS)   weight
+SGOV  US T-bill    (0.895, 0.220, 0.772)    0.694   ← deep OFAC corner
+RMB   ICBC cash    (0.390, 0.845, 0.495)    0.609   ← deep SAFE trap
+BTC   self-custody (0.072, 0.082, 0.076)    0.077   ← origin corner (sovereign-free)
+```
+
+### Bilingual viewer — six panels (`coordinates.html`)
+
+Self-contained (inlines the test-backed engine; runs from `file://` and GitHub Pages). Every on-screen label is `English / 中文`:
+
+1. **Asset Coordinates / 资产坐标** — the live `(X, Y, Z)` + exposure weight
+2. **Settlement System / 结算体系** · 3. **Custody Jurisdiction / 托管司法区** · 4. **Ownership Model / 所有权模式** · 5. **Asset Class / 资产类别** — each a bilingual selector showing that layer's per-axis contribution; edit any layer and the coordinate recomputes live
+6. **3D Terrain Map / 三维风险地图** — every asset plotted at `(OFAC, SAFE, CRS)`, bubble size = exposure weight
+
+### Hard rules (enforced by `tests/coordinate.test.js`)
+
+FinWar v4.0 is **only** a coordinate engine. It does **not** emit portfolio allocation, percentage weights, buy/sell recommendations, a strategy engine, or an optimizer — a test asserts no such field ever leaves the engine.
+
+```
+$ node tests/coordinate.test.js   # 29 passed, 0 failed
+```
+
+---
+
 ## Core thesis
 
 Under dual-direction financial warfare, an asset's fate is **not** a property of the asset. It is a property of the **chain of intermediaries** that stands between you and the value:
@@ -127,6 +200,7 @@ finwar/
 ├── index.html                      v3.2 UI — scenario toggles, phase selector, survival dashboard
 ├── demo.html                       self-contained v3.2 dashboard (double-click, offline)
 ├── terrain.html                    Financial Kill-Chain — settlement→custody→asset net + 3D exposure cloud
+├── coordinates.html                ★ v4.0 Asset Coordinate Engine — bilingual 6-panel viewer + 3D terrain map
 ├── data.json                       FACTS LAYER (positions only; no computed outputs)
 ├── package.json
 │
@@ -143,11 +217,16 @@ finwar/
 │   ├── simulation/
 │   │   ├── time_phases.js          T0 / T1 / T7 (§4)
 │   │   └── exit_engine.js          escape_window (§6/§7)
-│   └── terrain/                    v3.3 financial kill-chain engine (settlement → custody → asset)
-│       ├── nodes.js                settlement-network / custodian / jurisdiction / asset-class / ownership refs
-│       ├── risk_engine.js          ofacDependency engine (§3) → WarPath (§4) + scenario queries + migration (§6)
-│       ├── portfolio.js            §7 calibration assets (full Asset schema; no weights — §8)
-│       └── terrain.js              CLI → WarPaths + kill-chain risk map + §4 scenario queries
+│   ├── terrain/                    v3.3 financial kill-chain engine (settlement → custody → asset)
+│   │   ├── nodes.js                settlement-network / custodian / jurisdiction / asset-class / ownership refs
+│   │   ├── risk_engine.js          ofacDependency engine (§3) → WarPath (§4) + scenario queries + migration (§6)
+│   │   ├── portfolio.js            §7 calibration assets (full Asset schema; no weights — §8)
+│   │   └── terrain.js              CLI → WarPaths + kill-chain risk map + §4 scenario queries
+│   └── coordinate/                 ★ v4.0 Asset Coordinate Engine (4 layers → OFAC/SAFE/CRS point)
+│       ├── layers.js               4 bilingual layer tables + per-axis calibration + priority weights
+│       ├── coordinate_engine.js    calculateExposure → {OFAC,SAFE,CRS} · toVector · exposureWeight (pure)
+│       ├── assets.js               sample AssetNodes (4-field schema; no weights/allocation)
+│       └── types.d.ts              Core Schema (AssetNode / Exposure / AssetVector) typed contract
 │
 ├── test/                           ★ v4 TS suite (node --import tsx --test)
 │   ├── worldstate.test.ts          WorldState contract + engine invariants (15 checks)
@@ -155,7 +234,8 @@ finwar/
 │
 └── tests/                          v3.2 legacy suite (zero-dep, `npm run test:legacy`)
     ├── golden.test.js              3 mandatory v3.2 golden cases (§9)
-    └── terrain.test.js             v3.3 kill-chain engine validation (43 checks)
+    ├── terrain.test.js             v3.3 kill-chain engine validation (43 checks)
+    └── coordinate.test.js          v4.0 coordinate engine validation (29 checks)
 ```
 
 ---
@@ -360,12 +440,16 @@ npm test            # v4 WorldState suite + live finos decide() acceptance
 npm run dev         # wrangler dev → POST /simulate · GET /state · GET /health
 
 # ── FinWar v3.2 — legacy survival engine (zero-dependency) ──
-npm run test:legacy # node tests/golden.test.js && node tests/terrain.test.js
+npm run test:legacy # golden.test.js && terrain.test.js && coordinate.test.js
 npm run sim                                   # CLI simulation (default: dual)
 node engine/engine.js US_SANCTION CN_CAPITAL_LOCK GLOBAL_COLLAPSE
 
-# Financial Kill-Chain + zero-setup demo (open in a browser)
-# live:  https://alexmorerich.github.io/finwar/terrain.html   (GitHub Pages)
+# v4.0 Asset Coordinate Engine
+node tests/coordinate.test.js                 # coordinate engine validation (29 checks)
+
+# Financial Kill-Chain + zero-setup demos (open in a browser)
+# live:  https://alexmorerich.github.io/finwar/coordinates.html   (GitHub Pages)
+open coordinates.html # ★ v4.0 Asset Coordinate Engine — bilingual 6-panel + 3D terrain map
 open terrain.html   # Kill-Chain Graph · 3D Exposure Cloud (Plotly via CDN)
 open demo.html      # self-contained v3.2 dashboard (double-click, offline)
 npm run serve       # modular index.html → http://localhost:8080
