@@ -82,7 +82,7 @@
 <body>
 <header>
   <h1>◎ FINWAR · ASSET COORDINATE ENGINE / 资产坐标引擎</h1>
-  <span class="tag">v4.0 · Settlement × Custody × Ownership × Asset Class → (OFAC, SAFE, CRS) · 四层资产坐标</span>
+  <span class="tag">v4.0 · Settlement × Custody × Ownership × Asset Class → (OFAC, SAFE, TAX) · 四层资产坐标</span>
   <a href="./terrain.html">← v3.3 kill-chain</a>
 </header>
 
@@ -93,7 +93,7 @@
       <span class="chip ax on" data-ax="worst">Worst / 最高</span>
       <span class="chip ax" data-ax="OFAC">OFAC</span>
       <span class="chip ax" data-ax="SAFE">SAFE</span>
-      <span class="chip ax" data-ax="CRS">CRS</span>
+      <span class="chip ax" data-ax="TAX">TAX</span>
     </div>
   </div>
 
@@ -134,7 +134,7 @@
 
   <!-- Panel 6 · 3D Terrain Map / 三维风险地图 -->
   <div class="panel" style="padding:13px 15px 6px;">
-    <div class="pt">⑥ <b>3D Terrain Map</b><span class="zh">/ 三维风险地图</span> · X=OFAC · Y=SAFE · Z=CRS · bubble = exposure weight / 气泡=风险权重</div>
+    <div class="pt">⑥ <b>3D Terrain Map</b><span class="zh">/ 三维风险地图</span> · X=OFAC · Y=SAFE · Z=TAX · bubble = exposure weight / 气泡=风险权重</div>
   </div>
   <div id="plot"></div>
   <div class="plotnote" id="plotnote"></div>
@@ -142,7 +142,7 @@
   <div id="tablewrap"></div>
 
   <footer>
-    Deterministic asset <b>coordinate</b> engine / 确定性资产坐标引擎 — it locates an asset inside OFAC–SAFE–CRS space and nothing more.
+    Deterministic asset <b>coordinate</b> engine / 确定性资产坐标引擎 — it locates an asset inside OFAC–SAFE–TAX space and nothing more.
     <b>No</b> allocation, percentage weight, buy/sell, strategy, or optimization / 不含配置、权重、买卖、策略或优化.
     Heuristic model — not investment, legal, or tax advice. Engine &amp; tests: <code>engine/coordinate/</code> + <code>tests/coordinate.test.js</code>.
   </footer>
@@ -156,47 +156,47 @@
    ====================================================================== */
 
 // ---- engine/coordinate/layers.js ----
-const AXES = { OFAC:{en:"OFAC Exposure",zh:"OFAC风险"}, SAFE:{en:"SAFE Exposure",zh:"SAFE风险"}, CRS:{en:"CRS Exposure",zh:"CRS风险"} };
+const AXES = { OFAC:{en:"OFAC Exposure",zh:"OFAC风险"}, SAFE:{en:"SAFE Exposure",zh:"SAFE风险"}, TAX:{en:"TAX Exposure",zh:"TAX风险"} };
 const LAYER_PRIORITY = { settlement_system:0.40, custody_jurisdiction:0.30, ownership_model:0.20, asset_class:0.10 };
 const SETTLEMENT_SYSTEMS = {
-  US_Settlement:            { en:"US Settlement",            zh:"美国结算体系",   ofac:95, safe: 5, crs:70 },
-  Singapore_Settlement:     { en:"Singapore Settlement",     zh:"新加坡结算体系", ofac:30, safe:20, crs:75 },
-  HongKong_Settlement:      { en:"Hong Kong Settlement",     zh:"香港结算体系",   ofac:45, safe:50, crs:65 },
-  China_Settlement:         { en:"China Settlement",         zh:"中国结算体系",   ofac:25, safe:95, crs:40 },
-  Decentralized_Settlement: { en:"Decentralized Settlement", zh:"去中心化结算",   ofac: 8, safe: 8, crs: 8 },
-  Issuer_Crypto_Settlement: { en:"Issuer Crypto Settlement", zh:"发行方加密结算", ofac:70, safe:30, crs:30 },
-  Physical_Gold_Settlement: { en:"Physical Gold Settlement", zh:"实物黄金结算",   ofac: 5, safe:10, crs:20 },
-  Real_Estate_Settlement:   { en:"Real Estate Settlement",   zh:"房地产结算",     ofac:15, safe:60, crs:50 },
+  US_Settlement:            { en:"US Settlement",            zh:"美国结算体系",   ofac:95, safe: 5, tax:70 },
+  Singapore_Settlement:     { en:"Singapore Settlement",     zh:"新加坡结算体系", ofac:30, safe:20, tax:75 },
+  HongKong_Settlement:      { en:"Hong Kong Settlement",     zh:"香港结算体系",   ofac:45, safe:50, tax:65 },
+  China_Settlement:         { en:"China Settlement",         zh:"中国结算体系",   ofac:25, safe:95, tax:40 },
+  Decentralized_Settlement: { en:"Decentralized Settlement", zh:"去中心化结算",   ofac: 8, safe: 8, tax: 8 },
+  Issuer_Crypto_Settlement: { en:"Issuer Crypto Settlement", zh:"发行方加密结算", ofac:70, safe:30, tax:30 },
+  Physical_Gold_Settlement: { en:"Physical Gold Settlement", zh:"实物黄金结算",   ofac: 5, safe:10, tax:20 },
+  Real_Estate_Settlement:   { en:"Real Estate Settlement",   zh:"房地产结算",     ofac:15, safe:60, tax:50 },
 };
 const CUSTODY_JURISDICTIONS = {
-  US:            { en:"United States", zh:"美国",     ofac:90, safe: 5, crs:80 },
-  Singapore:     { en:"Singapore",     zh:"新加坡",   ofac:35, safe:20, crs:75 },
-  HongKong:      { en:"Hong Kong",     zh:"香港",     ofac:40, safe:55, crs:65 },
-  ChinaMainland: { en:"China Mainland", zh:"中国大陆", ofac:25, safe:95, crs:35 },
-  DMCC:          { en:"Dubai DMCC",    zh:"迪拜DMCC", ofac:30, safe:15, crs:45 },
-  None:          { en:"No Custody",    zh:"无托管",   ofac: 5, safe: 5, crs: 8 },
+  US:            { en:"United States", zh:"美国",     ofac:90, safe: 5, tax:80 },
+  Singapore:     { en:"Singapore",     zh:"新加坡",   ofac:35, safe:20, tax:75 },
+  HongKong:      { en:"Hong Kong",     zh:"香港",     ofac:40, safe:55, tax:65 },
+  ChinaMainland: { en:"China Mainland", zh:"中国大陆", ofac:25, safe:95, tax:35 },
+  DMCC:          { en:"Dubai DMCC",    zh:"迪拜DMCC", ofac:30, safe:15, tax:45 },
+  None:          { en:"No Custody",    zh:"无托管",   ofac: 5, safe: 5, tax: 8 },
 };
 const OWNERSHIP_MODELS = {
-  custodian:           { en:"Custodian",           zh:"托管模式",   ofac:80, safe:60, crs:85 },
-  nominee:             { en:"Nominee",             zh:"名义持有",   ofac:90, safe:65, crs:90 },
-  self_custody:        { en:"Self Custody",        zh:"自主保管",   ofac: 5, safe:10, crs: 5 },
-  physical_possession: { en:"Physical Possession", zh:"实物持有",   ofac:10, safe:20, crs:12 },
-  bearer:              { en:"Bearer Asset",        zh:"不记名资产", ofac:12, safe:15, crs: 8 },
-  direct_register:     { en:"Direct Registration", zh:"直接登记",   ofac:50, safe:55, crs:70 },
+  custodian:           { en:"Custodian",           zh:"托管模式",   ofac:80, safe:60, tax:85 },
+  nominee:             { en:"Nominee",             zh:"名义持有",   ofac:90, safe:65, tax:90 },
+  self_custody:        { en:"Self Custody",        zh:"自主保管",   ofac: 5, safe:10, tax: 5 },
+  physical_possession: { en:"Physical Possession", zh:"实物持有",   ofac:10, safe:20, tax:12 },
+  bearer:              { en:"Bearer Asset",        zh:"不记名资产", ofac:12, safe:15, tax: 8 },
+  direct_register:     { en:"Direct Registration", zh:"直接登记",   ofac:50, safe:55, tax:70 },
 };
 const ASSET_CLASSES = {
-  Equity:       { en:"Equity",         zh:"股票",     ofac:60, safe:55, crs:70 },
-  ETF:          { en:"ETF",            zh:"ETF",      ofac:65, safe:55, crs:72 },
-  FixedIncome:  { en:"Fixed Income",   zh:"固定收益", ofac:65, safe:50, crs:70 },
-  Cash:         { en:"Cash",           zh:"现金",     ofac:55, safe:60, crs:60 },
-  PhysicalGold: { en:"Physical Gold",  zh:"实物黄金", ofac:10, safe:15, crs:30 },
-  RealEstate:   { en:"Real Estate",    zh:"房地产",   ofac:20, safe:70, crs:50 },
-  Crypto:       { en:"Cryptocurrency", zh:"加密货币", ofac:15, safe:15, crs:10 },
-  Stablecoin:   { en:"Stablecoin",     zh:"稳定币",   ofac:70, safe:35, crs:25 },
-  PrivateAsset: { en:"Private Asset",  zh:"私募资产", ofac:45, safe:55, crs:40 },
+  Equity:       { en:"Equity",         zh:"股票",     ofac:60, safe:55, tax:70 },
+  ETF:          { en:"ETF",            zh:"ETF",      ofac:65, safe:55, tax:72 },
+  FixedIncome:  { en:"Fixed Income",   zh:"固定收益", ofac:65, safe:50, tax:70 },
+  Cash:         { en:"Cash",           zh:"现金",     ofac:55, safe:60, tax:60 },
+  PhysicalGold: { en:"Physical Gold",  zh:"实物黄金", ofac:10, safe:15, tax:30 },
+  RealEstate:   { en:"Real Estate",    zh:"房地产",   ofac:20, safe:70, tax:50 },
+  Crypto:       { en:"Cryptocurrency", zh:"加密货币", ofac:15, safe:15, tax:10 },
+  Stablecoin:   { en:"Stablecoin",     zh:"稳定币",   ofac:70, safe:35, tax:25 },
+  PrivateAsset: { en:"Private Asset",  zh:"私募资产", ofac:45, safe:55, tax:40 },
 };
 const TABLE = { settlement_system:SETTLEMENT_SYSTEMS, custody_jurisdiction:CUSTODY_JURISDICTIONS, ownership_model:OWNERSHIP_MODELS, asset_class:ASSET_CLASSES };
-const FALLBACK = { en:"Unknown", zh:"未知", ofac:50, safe:50, crs:50 };
+const FALLBACK = { en:"Unknown", zh:"未知", ofac:50, safe:50, tax:50 };
 const rec = (layer, k) => TABLE[layer][k] || FALLBACK;
 const bi = (r) => r ? `${r.en} / ${r.zh}` : "—";
 
@@ -211,31 +211,57 @@ function fuseAxis(asset, axis) {
     LAYER_PRIORITY.asset_class          * rec("asset_class",          asset.asset_class)[axis];
   return round3(clamp01(raw / 100));
 }
-const calculateExposure = a => ({ OFAC:fuseAxis(a,"ofac"), SAFE:fuseAxis(a,"safe"), CRS:fuseAxis(a,"crs") });
-const toVector = a => { const e = calculateExposure(a); return { x:e.OFAC, y:e.SAFE, z:e.CRS }; };
+const calculateExposure = a => ({ OFAC:fuseAxis(a,"ofac"), SAFE:fuseAxis(a,"safe"), TAX:fuseAxis(a,"tax") });
+const toVector = a => { const e = calculateExposure(a); return { x:e.OFAC, y:e.SAFE, z:e.TAX }; };
 const SQRT3 = Math.sqrt(3);
 const exposureWeight = a => { const v = toVector(a); return round3(Math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z)/SQRT3); };
 
-// ---- engine/coordinate/assets.js (sample AssetNodes) ----
+// ---- engine/current_holdings/assets.js — the user's property cluster ----
+// The 8 sanction-risk paths / 26 stated holdings, as pure AssetNodes (id + the four
+// coordinates only). PORTFOLIO-INDEPENDENT: no percentage / weight / allocation is
+// carried here — the viewer plots WHERE each asset sits, never how much is held.
 const SAMPLE_ASSETS = [
-  { id:"SGOV",       label:"iShares 0-3M Treasury ETF (SGOV)", settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"nominee",         asset_class:"ETF" },
-  { id:"O87",        label:"SPDR Gold Shares (SGX O87)",        settlement_system:"US_Settlement",            custody_jurisdiction:"Singapore",     ownership_model:"nominee",         asset_class:"ETF" },
-  { id:"D05",        label:"DBS Group Holdings (SGX D05)",      settlement_system:"Singapore_Settlement",     custody_jurisdiction:"Singapore",     ownership_model:"direct_register", asset_class:"Equity" },
-  { id:"UST10Y",     label:"US Treasury 10Y note (direct)",     settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"custodian",       asset_class:"FixedIncome" },
-  { id:"2800",       label:"Tracker Fund of Hong Kong (2800)",  settlement_system:"HongKong_Settlement",      custody_jurisdiction:"HongKong",      ownership_model:"custodian",       asset_class:"ETF" },
-  { id:"USDC_SG",    label:"USDC at a Singapore exchange",      settlement_system:"Issuer_Crypto_Settlement", custody_jurisdiction:"Singapore",     ownership_model:"custodian",       asset_class:"Stablecoin" },
-  { id:"PE_FUND_SG", label:"Singapore private-equity fund",     settlement_system:"Singapore_Settlement",     custody_jurisdiction:"Singapore",     ownership_model:"nominee",         asset_class:"PrivateAsset" },
-  { id:"RMB_ICBC",   label:"RMB demand deposit at ICBC",        settlement_system:"China_Settlement",         custody_jurisdiction:"ChinaMainland", ownership_model:"custodian",       asset_class:"Cash" },
-  { id:"SZ_PROPERTY",label:"Shenzhen residential real estate",  settlement_system:"Real_Estate_Settlement",   custody_jurisdiction:"ChinaMainland", ownership_model:"direct_register", asset_class:"RealEstate" },
-  { id:"GOLD_DMCC",  label:"Physical gold bar (DMCC vault)",    settlement_system:"Physical_Gold_Settlement", custody_jurisdiction:"DMCC",          ownership_model:"bearer",          asset_class:"PhysicalGold" },
-  { id:"BTC_COLD",   label:"BTC — cold wallet (self-custody)",  settlement_system:"Decentralized_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",    asset_class:"Crypto" },
+  // ── Path 1 · US path DTCC/SWIFT/CHIPS ──
+  { id:"GLDM",       label:"P1 · SPDR Gold MiniShares (GLDM) — IBKR",        settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"nominee",            asset_class:"ETF" },
+  { id:"QQQM",       label:"P1 · Invesco NASDAQ-100 (QQQM) — Schwab",        settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"nominee",            asset_class:"ETF" },
+  { id:"DBS_USD_SG", label:"P1 · USD fixed deposit — DBS Singapore",         settlement_system:"US_Settlement",            custody_jurisdiction:"Singapore",     ownership_model:"custodian",          asset_class:"Cash" },
+  { id:"O87",        label:"P1 · SPDR Gold Shares (SGX O87) — StanChart SG", settlement_system:"US_Settlement",            custody_jurisdiction:"Singapore",     ownership_model:"nominee",            asset_class:"ETF" },
+  { id:"S27",        label:"P1 · SPDR S&P 500 (SGX S27) — StanChart SG",     settlement_system:"US_Settlement",            custody_jurisdiction:"Singapore",     ownership_model:"nominee",            asset_class:"ETF" },
+  { id:"SGOV",       label:"P1 · iShares SGOV T-bill ETF — Wing Lung HK",    settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"nominee",            asset_class:"ETF" },
+  { id:"VGSH",       label:"P1 · Vanguard Short Treasury (VGSH) — BOCHK",    settlement_system:"US_Settlement",            custody_jurisdiction:"US",            ownership_model:"nominee",            asset_class:"ETF" },
+  { id:"DBS_USD_HK", label:"P1 · USD fixed deposit — DBS Hong Kong",         settlement_system:"US_Settlement",            custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"Cash" },
+  { id:"WL_USD_MMF", label:"P1 · USD money-market fund — Wing Lung HK",      settlement_system:"US_Settlement",            custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"Cash" },
+  { id:"BOC_USD_MMF",label:"P1 · USD money-market fund — BOCHK",             settlement_system:"US_Settlement",            custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"Cash" },
+  // ── Path 2 · Singapore path CDP/SGX/PayNow ──
+  { id:"D05",        label:"P2 · DBS Group Holdings (SGX D05)",              settlement_system:"Singapore_Settlement",     custody_jurisdiction:"Singapore",     ownership_model:"direct_register",    asset_class:"Equity" },
+  { id:"GLS",        label:"P2 · DBS Bank stock (GLS — ticker unverified)",  settlement_system:"Singapore_Settlement",     custody_jurisdiction:"Singapore",     ownership_model:"direct_register",    asset_class:"Equity" },
+  // ── Path 3 · HKEX + FPS path ──
+  { id:"VG3081",     label:"P3 · Value Gold ETF (HKEX 3081) — StanChart HK", settlement_system:"HongKong_Settlement",      custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"ETF" },
+  { id:"TF2800",     label:"P3 · Tracker Fund of HK (2800) — StanChart HK",  settlement_system:"HongKong_Settlement",      custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"ETF" },
+  { id:"WL_HKD_MMF", label:"P3 · HKD money-market fund — Wing Lung HK",      settlement_system:"HongKong_Settlement",      custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"Cash" },
+  { id:"BOC_HKD_MMF",label:"P3 · HKD money-market fund — BOCHK",             settlement_system:"HongKong_Settlement",      custody_jurisdiction:"HongKong",      ownership_model:"custodian",          asset_class:"Cash" },
+  // ── Path 4 · China CNSDC + CIPS path ──
+  { id:"CSI300",     label:"P4 · Huatai-PineBridge CSI 300 ETF (510300)",    settlement_system:"China_Settlement",         custody_jurisdiction:"ChinaMainland", ownership_model:"direct_register",    asset_class:"ETF" },
+  { id:"RMB_CASH",   label:"P4 · RMB demand deposit (onshore)",              settlement_system:"China_Settlement",         custody_jurisdiction:"ChinaMainland", ownership_model:"custodian",          asset_class:"Cash" },
+  // ── Path 5 · cold wallet · decentralized (censorship-resistant) ──
+  { id:"BTC",        label:"P5 · Bitcoin (BTC) — cold wallet",               settlement_system:"Decentralized_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",       asset_class:"Crypto" },
+  { id:"XMR",        label:"P5 · Monero (XMR) — cold wallet",                settlement_system:"Decentralized_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",       asset_class:"Crypto" },
+  // ── Path 6 · cold wallet · issuer-RISK tokens (NOT censorship-resistant) ──
+  { id:"USDC",       label:"P6 · USDC — issuer-freezable (cold wallet)",     settlement_system:"Issuer_Crypto_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",       asset_class:"Stablecoin" },
+  { id:"XAUT",       label:"P6 · Tether Gold (XAUT) — issuer token",         settlement_system:"Issuer_Crypto_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",       asset_class:"Stablecoin" },
+  { id:"USDT",       label:"P6 · Tether USD (USDT) — issuer token",          settlement_system:"Issuer_Crypto_Settlement", custody_jurisdiction:"None",          ownership_model:"self_custody",       asset_class:"Stablecoin" },
+  // ── Path 7 · physical gold bars ──
+  { id:"CN_GOLD",    label:"P7 · Physical gold — China mainland (locked)",   settlement_system:"Physical_Gold_Settlement", custody_jurisdiction:"ChinaMainland", ownership_model:"physical_possession",asset_class:"PhysicalGold" },
+  { id:"DMCC_GOLD",  label:"P7 · Physical gold — DMCC Dubai vault",          settlement_system:"Physical_Gold_Settlement", custody_jurisdiction:"DMCC",          ownership_model:"bearer",             asset_class:"PhysicalGold" },
+  // ── Path 8 · real estate ──
+  { id:"SZ_PROP",    label:"P8 · Shenzhen residential real estate",         settlement_system:"Real_Estate_Settlement",   custody_jurisdiction:"ChinaMainland", ownership_model:"direct_register",    asset_class:"RealEstate" },
 ];
 
 /* ================= view ================= */
 const COL = { hi:"#ef4444", mid:"#f0b429", lo:"#2ec16b" };
 const band = v => v > 0.65 ? "hi" : v >= 0.35 ? "mid" : "lo";       // 0–1
 const bandColor = v => COL[band(v)];
-const axisColor = (e, ax) => ax === "worst" ? bandColor(Math.max(e.OFAC, e.SAFE, e.CRS)) : bandColor(e[ax]);
+const axisColor = (e, ax) => ax === "worst" ? bandColor(Math.max(e.OFAC, e.SAFE, e.TAX)) : bandColor(e[ax]);
 const pct = v => Math.round(v * 100);
 
 // live AssetNode the panels operate on (seeded from the first sample)
@@ -275,14 +301,14 @@ function renderCoords() {
       <div class="bar"><span style="width:${pct(v)}%;background:${c}"></span></div></div>`;
   };
   document.getElementById("coordRow").innerHTML =
-    axCard("OFAC") + `<div class="coordsep"></div>` + axCard("SAFE") + `<div class="coordsep"></div>` + axCard("CRS")
+    axCard("OFAC") + `<div class="coordsep"></div>` + axCard("SAFE") + `<div class="coordsep"></div>` + axCard("TAX")
     + `<div class="axis wpill">
         <div class="ak">exposure weight / 风险权重</div>
         <div class="av" style="color:${bandColor(w)}">${w.toFixed(3)}</div>
-        <div class="vecpill">(x, y, z) = (${e.OFAC.toFixed(2)}, ${e.SAFE.toFixed(2)}, ${e.CRS.toFixed(2)})</div></div>`;
+        <div class="vecpill">(x, y, z) = (${e.OFAC.toFixed(2)}, ${e.SAFE.toFixed(2)}, ${e.TAX.toFixed(2)})</div></div>`;
 }
 
-/* ---- Panels 2–5 · each layer's (OFAC,SAFE,CRS) contribution ---- */
+/* ---- Panels 2–5 · each layer's (OFAC,SAFE,TAX) contribution ---- */
 function renderLayerMini(layer) {
   const r = rec(layer, state.asset[layer]);
   const cell = (k, score) => {
@@ -290,7 +316,7 @@ function renderLayerMini(layer) {
     return `<div class="m"><div class="mk">${k}</div><div class="mv" style="color:${c}">${score}</div>
       <div class="mbar"><span style="width:${score}%;background:${c}"></span></div></div>`;
   };
-  document.getElementById("mini_" + layer).innerHTML = cell("OFAC", r.ofac) + cell("SAFE", r.safe) + cell("CRS", r.crs);
+  document.getElementById("mini_" + layer).innerHTML = cell("OFAC", r.ofac) + cell("SAFE", r.safe) + cell("TAX", r.tax);
 }
 
 /* ---- Panel 6 · 3D terrain map (all assets; selected one ringed) ---- */
@@ -298,18 +324,18 @@ function cloudTraces() {
   const x=[], y=[], z=[], text=[], color=[], size=[], line=[];
   for (const a of SAMPLE_ASSETS) {
     const e = calculateExposure(a), w = exposureWeight(a);
-    x.push(e.OFAC); y.push(e.SAFE); z.push(e.CRS);
+    x.push(e.OFAC); y.push(e.SAFE); z.push(e.TAX);
     size.push(10 + w * 34);
     color.push(axisColor(e, state.ax));
     line.push(a.id === state.asset.id ? "#ffffff" : "#04101f");
-    text.push(`<b>${a.label}</b><br>(x,y,z) = (${e.OFAC.toFixed(2)}, ${e.SAFE.toFixed(2)}, ${e.CRS.toFixed(2)})`
-      + `<br>OFAC ${e.OFAC.toFixed(3)} · SAFE ${e.SAFE.toFixed(3)} · CRS ${e.CRS.toFixed(3)} · weight ${w.toFixed(3)}`
+    text.push(`<b>${a.label}</b><br>(x,y,z) = (${e.OFAC.toFixed(2)}, ${e.SAFE.toFixed(2)}, ${e.TAX.toFixed(2)})`
+      + `<br>OFAC ${e.OFAC.toFixed(3)} · SAFE ${e.SAFE.toFixed(3)} · TAX ${e.TAX.toFixed(3)} · weight ${w.toFixed(3)}`
       + `<br>${bi(rec("settlement_system",a.settlement_system))} · ${bi(rec("custody_jurisdiction",a.custody_jurisdiction))}`
       + `<br>${bi(rec("ownership_model",a.ownership_model))} · ${bi(rec("asset_class",a.asset_class))}`);
   }
   // vertical stems to the OFAC–SAFE floor (z=0) for depth reading
   const stems = { type:"scatter3d", mode:"lines", x:[], y:[], z:[], hoverinfo:"skip", showlegend:false, line:{ color:"rgba(120,140,170,0.22)", width:2 } };
-  for (const a of SAMPLE_ASSETS) { const e = calculateExposure(a); stems.x.push(e.OFAC,e.OFAC,null); stems.y.push(e.SAFE,e.SAFE,null); stems.z.push(0,e.CRS,null); }
+  for (const a of SAMPLE_ASSETS) { const e = calculateExposure(a); stems.x.push(e.OFAC,e.OFAC,null); stems.y.push(e.SAFE,e.SAFE,null); stems.z.push(0,e.TAX,null); }
   const pts = { type:"scatter3d", mode:"markers", x, y, z, text, hoverinfo:"text",
     marker:{ size, color, line:{ width:2, color:line }, opacity:0.95 }, showlegend:false };
   return [stems, pts];
@@ -318,7 +344,7 @@ function cloudLayout() {
   const axis = (t) => ({ title:{ text:t, font:{ size:11, color:"#8fa2bd", family:"var(--mono)" } }, range:[0,1],
     backgroundcolor:"rgba(0,0,0,0)", gridcolor:"rgba(80,110,150,0.18)", zerolinecolor:"rgba(80,110,150,0.3)", showbackground:true, tickfont:{ size:9, color:"#6c7e96" } });
   return { paper_bgcolor:"#05070d", margin:{ l:0, r:0, t:6, b:0 },
-    scene:{ xaxis:axis("X · OFAC风险"), yaxis:axis("Y · SAFE风险"), zaxis:axis("Z · CRS风险"),
+    scene:{ xaxis:axis("X · OFAC风险"), yaxis:axis("Y · SAFE风险"), zaxis:axis("Z · TAX风险"),
       aspectratio:{ x:1, y:1, z:1 }, camera:{ eye:{ x:1.55, y:-1.6, z:0.95 }, center:{ x:0, y:0, z:-0.08 } }, bgcolor:"#05070d" } };
 }
 const plot = document.getElementById("plot");
@@ -330,9 +356,9 @@ function renderPlot() {
   }
   Plotly.react(plot, cloudTraces(), cloudLayout(), { displayModeBar:false, responsive:true });
   document.getElementById("plotnote").innerHTML =
-    "Each asset is one point at (OFAC, SAFE, CRS); bubble size = exposure weight (distance from the safe origin). "
+    "Each asset is one point at (OFAC, SAFE, TAX); bubble size = exposure weight (distance from the safe origin). "
     + "Self-custody / physical sit near the origin; US-settled positions spike X(OFAC); onshore-China assets spike Y(SAFE). "
-    + "<span class='zh'>每个资产是 (OFAC, SAFE, CRS) 空间中的一个点；气泡大小=风险权重。自主保管/实物资产靠近原点；美国结算资产在 X(OFAC) 轴突出；中国境内资产在 Y(SAFE) 轴突出。</span>";
+    + "<span class='zh'>每个资产是 (OFAC, SAFE, TAX) 空间中的一个点；气泡大小=风险权重。自主保管/实物资产靠近原点；美国结算资产在 X(OFAC) 轴突出；中国境内资产在 Y(SAFE) 轴突出。</span>";
 }
 
 /* ---- table of all assets ---- */
@@ -342,12 +368,12 @@ function renderTable() {
     const c = axisColor(e, state.ax);
     return `<tr class="assetrow ${a.id === state.asset.id ? "sel" : ""}" data-id="${a.id}">
       <td><span class="dot" style="background:${c}"></span>${a.label}</td>
-      <td class="num">${e.OFAC.toFixed(3)}</td><td class="num">${e.SAFE.toFixed(3)}</td><td class="num">${e.CRS.toFixed(3)}</td>
+      <td class="num">${e.OFAC.toFixed(3)}</td><td class="num">${e.SAFE.toFixed(3)}</td><td class="num">${e.TAX.toFixed(3)}</td>
       <td class="num">${w.toFixed(3)}</td>
       <td class="zh" style="font-size:11px">${rec("settlement_system",a.settlement_system).zh} · ${rec("custody_jurisdiction",a.custody_jurisdiction).zh}</td></tr>`;
   }).join("");
   document.getElementById("tablewrap").innerHTML = `<table>
-    <thead><tr><th>Asset <span class="zh">资产</span></th><th>X · OFAC</th><th>Y · SAFE</th><th>Z · CRS</th>
+    <thead><tr><th>Asset <span class="zh">资产</span></th><th>X · OFAC</th><th>Y · SAFE</th><th>Z · TAX</th>
       <th>Weight <span class="zh">权重</span></th><th>Settlement · Custody <span class="zh">结算·托管</span></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
   document.querySelectorAll("tr.assetrow").forEach(el => el.addEventListener("click", () => {
