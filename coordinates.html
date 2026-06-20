@@ -23,6 +23,11 @@
   .controls { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
   .grp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .lbl { color: var(--mut); font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; margin-right: 2px; }
+  /* asset picker — wraps onto as many lines as needed, never scrolls sideways */
+  .grp.pick { flex: 1 1 100%; align-items: flex-start; }
+  #picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 1 1 0; min-width: 0; }
+  .pktier { color: var(--accent); font-family: var(--mono); font-size: 10px; letter-spacing: .5px; opacity: .7; padding-left: 8px; align-self: center; }
+  .pktier:first-child { padding-left: 0; }
   .chip { cursor: pointer; user-select: none; border: 1px solid var(--line); background: var(--panel2); color: var(--txt);
     padding: 7px 12px; border-radius: 8px; font-size: 12.5px; transition: .12s; }
   .chip:hover { border-color: var(--accent); }
@@ -88,7 +93,7 @@
 
 <div class="wrap">
   <div class="controls">
-    <div class="grp"><span class="lbl">Load asset / 载入资产</span><span id="picker"></span></div>
+    <div class="grp pick"><span class="lbl">Load asset / 载入资产</span><span id="picker"></span></div>
     <div class="grp"><span class="lbl">Color axis / 着色轴</span>
       <span class="chip ax on" data-ax="worst">Worst / 最高</span>
       <span class="chip ax" data-ax="OFAC">OFAC</span>
@@ -268,8 +273,14 @@ const pct = v => Math.round(v * 100);
 const state = { asset: { ...SAMPLE_ASSETS[0] }, ax: "worst" };
 
 function buildPicker() {
-  document.getElementById("picker").innerHTML = SAMPLE_ASSETS
-    .map(a => `<span class="chip pk" data-id="${a.id}">${a.id}</span>`).join("");
+  let lastTier = null;                                   // emit a P-tier marker each time the tier changes
+  document.getElementById("picker").innerHTML = SAMPLE_ASSETS.map(a => {
+    const m = (a.label || "").match(/^P(\d+)/);
+    const tier = m ? "P" + m[1] : "·";
+    const mark = tier !== lastTier ? `<span class="pktier">${tier}</span>` : "";
+    lastTier = tier;
+    return mark + `<span class="chip pk" data-id="${a.id}">${a.id}</span>`;
+  }).join("");
   document.querySelectorAll(".chip.pk").forEach(el => el.addEventListener("click", () => {
     const a = SAMPLE_ASSETS.find(s => s.id === el.dataset.id);
     state.asset = { ...a };
